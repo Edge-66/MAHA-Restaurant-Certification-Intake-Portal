@@ -27,6 +27,7 @@ export default function AdminFarmDetailPage() {
   const [farm, setFarm] = useState<Farm | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [editFields, setEditFields] = useState({
@@ -110,6 +111,8 @@ export default function AdminFarmDetailPage() {
     await supabase.from('farms').update(updateData).eq('id', id);
     await fetchFarm();
     setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,6 +207,11 @@ export default function AdminFarmDetailPage() {
 
   return (
     <div className="max-w-4xl">
+      {saved && (
+        <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg text-sm font-medium">
+          Changes saved successfully.
+        </div>
+      )}
       <button
         onClick={() => router.push('/admin/farms')}
         className="text-sm text-[#2d6a4f] hover:underline mb-6 inline-block"

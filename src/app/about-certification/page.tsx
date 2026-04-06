@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Reveal from '@/components/Reveal';
 
 // ─── CONTENT ────────────────────────────────────────────────────────────────
 // Edit the sections below to update page copy without touching layout code.
@@ -124,7 +125,7 @@ export default function AboutCertificationPage() {
       </section>
 
       {/* ── Who it's for ── */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Reveal as="section" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             {
@@ -146,12 +147,12 @@ export default function AboutCertificationPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       <div className="border-t border-stone-100" />
 
       {/* ── How It Works ── */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Reveal as="section" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <SectionLabel>Process</SectionLabel>
         <h2 className="text-3xl font-bold text-stone-900 mb-4">How It Works</h2>
         <p className="text-stone-600 mb-12 max-w-2xl">
@@ -197,16 +198,16 @@ export default function AboutCertificationPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       <div className="border-t border-stone-100" />
 
       {/* ── What Is a From the Farm Dish ── */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Reveal as="section" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <SectionLabel>Scope</SectionLabel>
         <h2 className="text-3xl font-bold text-stone-900 mb-4">What Is a From the Farm Dish?</h2>
         <p className="text-stone-600 mb-8 max-w-2xl">
-          MAHA certification is dish-level, not restaurant-level. That distinction is intentional.
+          At the base level, MAHA certification works dish by dish — each certified dish stands on its own. Once a restaurant earns certification on 7 or more dishes, the restaurant itself becomes MAHA Certified, reflecting a broader commitment to clean, transparent sourcing across the menu.
         </p>
         <div className="bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 rounded-xl p-6 mb-8">
           <h3 className="font-semibold text-stone-900 mb-2">The Main Element</h3>
@@ -233,12 +234,12 @@ export default function AboutCertificationPage() {
         <p className="text-xs text-stone-400 mt-4">
           Certification applies to the main element only. Other dish components are not evaluated in the current program.
         </p>
-      </section>
+      </Reveal>
 
       <div className="border-t border-stone-100" />
 
       {/* ── Standards ── */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Reveal as="section" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <SectionLabel>Standards</SectionLabel>
         <h2 className="text-3xl font-bold text-stone-900 mb-4">Program Standards</h2>
         <p className="text-stone-600 mb-12 max-w-2xl">
@@ -310,12 +311,12 @@ export default function AboutCertificationPage() {
             </ul>
           </div>
         </div>
-      </section>
+      </Reveal>
 
       <div className="border-t border-stone-100" />
 
       {/* ── Verification ── */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Reveal as="section" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <SectionLabel>Verification</SectionLabel>
         <h2 className="text-3xl font-bold text-stone-900 mb-4">How We Verify</h2>
         <p className="text-stone-600 mb-10 max-w-2xl">
@@ -370,12 +371,12 @@ export default function AboutCertificationPage() {
             about the scope or coverage of any external certification body.
           </p>
         </div>
-      </section>
+      </Reveal>
 
       <div className="border-t border-stone-100" />
 
       {/* ── Public Transparency ── */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Reveal as="section" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <SectionLabel>Transparency</SectionLabel>
         <h2 className="text-3xl font-bold text-stone-900 mb-4">What Gets Listed Publicly</h2>
         <p className="text-stone-600 mb-10 max-w-2xl">
@@ -403,12 +404,12 @@ export default function AboutCertificationPage() {
             ))}
           </ul>
         </div>
-      </section>
+      </Reveal>
 
       <div className="border-t border-stone-100" />
 
       {/* ── FAQ ── */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Reveal as="section" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <SectionLabel>FAQ</SectionLabel>
         <h2 className="text-3xl font-bold text-stone-900 mb-10">Common Questions</h2>
         <div className="space-y-4">
@@ -419,10 +420,10 @@ export default function AboutCertificationPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       {/* ── CTA ── */}
-      <section className="bg-[#1b4332]">
+      <Reveal as="section" className="bg-[#1b4332]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to apply?</h2>
           <p className="text-white/70 mb-8 max-w-lg mx-auto">
@@ -443,7 +444,7 @@ export default function AboutCertificationPage() {
             </Link>
           </div>
         </div>
-      </section>
+      </Reveal>
     </div>
   );
 }

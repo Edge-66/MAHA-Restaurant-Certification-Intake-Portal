@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { Farm } from '@/lib/types';
 import { distanceMiles } from '@/lib/geocode';
+import Reveal from '@/components/Reveal';
 
 // Dynamic import to avoid SSR issues with Leaflet
 const DirectoryMap = dynamic(() => import('@/components/DirectoryMap'), { ssr: false });
@@ -133,15 +134,15 @@ export default function DirectoryClient({ restaurants, farms }: Props) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-      <div className="mb-10">
+      <Reveal className="mb-10">
         <h1 className="text-3xl font-bold text-stone-900 mb-2">Directory</h1>
         <p className="text-stone-600">
           Explore restaurants and farms participating in the MAHA From the Farm program.
         </p>
-      </div>
+      </Reveal>
 
       {/* Zip Code Search */}
-      <div className="bg-white border border-stone-200 rounded-xl p-5 mb-8">
+      <Reveal delay={80} className="bg-white border border-stone-200 rounded-xl p-5 mb-8">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
           <div className="flex-1 sm:max-w-xs">
             <label className="block text-sm font-medium text-stone-700 mb-1">Find near you</label>
@@ -188,7 +189,7 @@ export default function DirectoryClient({ restaurants, farms }: Props) {
             Showing {filteredPins.length} result{filteredPins.length !== 1 ? 's' : ''} within {searchRadius} miles of {zipCode}
           </p>
         )}
-      </div>
+      </Reveal>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-8 border-b border-stone-200 overflow-x-auto scrollbar-none">

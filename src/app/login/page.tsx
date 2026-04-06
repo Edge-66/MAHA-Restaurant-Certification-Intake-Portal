@@ -116,6 +116,13 @@ function LoginForm() {
           </form>
         </div>
 
+        <p className="text-center text-sm text-stone-500 mt-5">
+          Don&apos;t have an account?{' '}
+          <Link href="/apply" className="text-[#2d6a4f] font-medium hover:underline">
+            Apply now
+          </Link>
+        </p>
+
       </div>
     </div>
   );

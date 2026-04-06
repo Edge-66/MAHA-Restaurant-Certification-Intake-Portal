@@ -4,6 +4,7 @@ import { useState } from 'react';
 import DishFormSection from '@/components/DishFormSection';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
 import { submitApplication } from '@/lib/actions';
+import Reveal from '@/components/Reveal';
 
 const emptyDish: DishFormData = {
   name: '',
@@ -107,7 +108,7 @@ export default function ApplyPage() {
       )}
 
       {/* Applicant Type Toggle */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
+      <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
         <h2 className="text-xl font-semibold text-stone-900 mb-4">I am applying as a...</h2>
         <div className="grid grid-cols-2 gap-4">
           <button
@@ -139,11 +140,11 @@ export default function ApplyPage() {
             </p>
           </button>
         </div>
-      </div>
+      </Reveal>
 
       <form onSubmit={handleSubmit}>
         {/* Section 1: Basic Info (shared) */}
-        <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
+        <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
           <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
             <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">1</span>
             {applicantType === 'restaurant' ? 'Restaurant' : 'Farm'} Information
@@ -222,10 +223,10 @@ export default function ApplyPage() {
               />
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* Account password */}
-        <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
+        <Reveal delay={60} className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
           <h2 className="text-xl font-semibold text-stone-900 mb-2 flex items-center gap-2">
             <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
             Create your account
@@ -263,11 +264,11 @@ export default function ApplyPage() {
               />
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* Farm-specific fields */}
         {applicantType === 'farm' && (
-          <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
+          <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
             <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
               <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">3</span>
               Farm Details
@@ -320,12 +321,12 @@ export default function ApplyPage() {
                 />
               </div>
             </div>
-          </div>
+          </Reveal>
         )}
 
         {/* Restaurant-specific: Dish Submissions */}
         {applicantType === 'restaurant' && (
-          <div className="mb-8">
+          <Reveal className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
                 <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">3</span>
@@ -351,11 +352,11 @@ export default function ApplyPage() {
                 />
               ))}
             </div>
-          </div>
+          </Reveal>
         )}
 
         {/* Attestation */}
-        <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
+        <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
           <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
             <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">4</span>
             Attestation
@@ -411,7 +412,7 @@ export default function ApplyPage() {
               </span>
             </label>
           </div>
-        </div>
+        </Reveal>
 
         <div className="flex justify-end">
           <button

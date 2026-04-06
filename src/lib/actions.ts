@@ -279,6 +279,17 @@ export async function updateDishStatus(dishId: string, status: string) {
     updateData.approved_at = new Date().toISOString();
   }
 
+  // Get the restaurant_id before updating
+  const { data: dish, error: dishFetchError } = await supabase
+    .from('dishes')
+    .select('restaurant_id')
+    .eq('id', dishId)
+    .single();
+
+  if (dishFetchError || !dish) {
+    throw new Error('Dish not found');
+  }
+
   const { error } = await supabase
     .from('dishes')
     .update(updateData)
@@ -287,4 +298,19 @@ export async function updateDishStatus(dishId: string, status: string) {
   if (error) {
     throw new Error(`Failed to update dish: ${error.message}`);
   }
+
+  // Recount approved dishes for this restaurant and sync participation_level
+  const { count } = await supabase
+    .from('dishes')
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', dish.restaurant_id)
+    .eq('status', 'approved');
+
+  const approvedCount = count ?? 0;
+  const newLevel = approvedCount >= 7 ? 'certified' : 'participant';
+
+  await supabase
+    .from('restaurants')
+    .update({ participation_level: newLevel })
+    .eq('id', dish.restaurant_id);
 }

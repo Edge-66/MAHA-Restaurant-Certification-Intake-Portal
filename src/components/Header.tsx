@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Great_Vibes } from 'next/font/google';
 import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400' });
 
@@ -15,12 +16,39 @@ const NAV_ITEMS = [
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const [dashboardHref, setDashboardHref] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isHome = pathname === '/';
 
   // Close on route change
   useEffect(() => { setOpen(false); }, [pathname]);
+
+  // Check auth state to show correct nav link
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { setDashboardHref(null); return; }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      if (profile?.role === 'restaurant') setDashboardHref('/dashboard/restaurant');
+      else if (profile?.role === 'farm') setDashboardHref('/dashboard/farm');
+      else setDashboardHref('/admin');
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) { setDashboardHref(null); return; }
+      supabase.from('profiles').select('role').eq('id', session.user.id).single().then(({ data: profile }) => {
+        if (profile?.role === 'restaurant') setDashboardHref('/dashboard/restaurant');
+        else if (profile?.role === 'farm') setDashboardHref('/dashboard/farm');
+        else setDashboardHref('/admin');
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -80,10 +108,10 @@ export default function Header() {
                   ))}
                   <div className="my-2 border-t border-stone-100" />
                   <Link
-                    href="/login"
+                    href={dashboardHref ?? '/login'}
                     className="block px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50 hover:text-stone-900 transition-colors"
                   >
-                    Sign In
+                    {dashboardHref ? 'Dashboard' : 'Sign In'}
                   </Link>
                 </nav>
               </div>
