@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import DishFormSection from '@/components/DishFormSection';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
-import { createClient } from '@/lib/supabase/client';
+import { submitApplication } from '@/lib/actions';
 
 const emptyDish: DishFormData = {
   name: '',
@@ -21,7 +20,6 @@ const emptyDish: DishFormData = {
 };
 
 export default function ApplyPage() {
-  const router = useRouter();
   const [applicantType, setApplicantType] = useState<'restaurant' | 'farm'>('restaurant');
   const [dishes, setDishes] = useState<DishFormData[]>([{ ...emptyDish }]);
   const [submitting, setSubmitting] = useState(false);
@@ -51,94 +49,40 @@ export default function ApplyPage() {
       setError('Please agree to all attestation statements.');
       return;
     }
+
+    const form = e.currentTarget;
+    const pw = (form.elements.namedItem('account_password') as HTMLInputElement)?.value ?? '';
+    const pwConfirm = (form.elements.namedItem('account_password_confirm') as HTMLInputElement)?.value ?? '';
+
+    if (pw.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    if (pw !== pwConfirm) {
+      setError('Password and confirmation do not match.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
+    const formData = new FormData(form);
+    formData.set('applicant_type', applicantType);
+    formData.set('dishes_json', JSON.stringify(dishes));
+
     try {
-      const form = e.currentTarget;
-      const formData = new FormData(form);
-      const supabase = createClient();
-
-      if (applicantType === 'farm') {
-        // Insert farm
-        const farmData = {
-          name: formData.get('name') as string,
-          contact_name: formData.get('contact_name') as string,
-          contact_email: formData.get('contact_email') as string,
-          contact_phone: formData.get('contact_phone') as string,
-          website: (formData.get('website') as string) || null,
-          address: (formData.get('address') as string) || null,
-          city: formData.get('city') as string,
-          state: formData.get('state') as string,
-          zip: (formData.get('zip') as string) || null,
-          description: (formData.get('description') as string) || null,
-          livestock_types: (formData.get('livestock_types') as string) || null,
-          produce_types: (formData.get('produce_types') as string) || null,
-          regenerative_practices: (formData.get('regenerative_practices') as string) || null,
-          certifications: (formData.get('certifications') as string) || null,
-        };
-
-        const { error: fError } = await supabase
-          .from('farms')
-          .insert(farmData);
-
-        if (fError) throw new Error(fError.message);
-      } else {
-        // Insert restaurant
-        const restaurantData = {
-          name: formData.get('name') as string,
-          contact_name: formData.get('contact_name') as string,
-          contact_email: formData.get('contact_email') as string,
-          contact_phone: formData.get('contact_phone') as string,
-          website: (formData.get('website') as string) || null,
-          address: formData.get('address') as string,
-          city: formData.get('city') as string,
-          state: formData.get('state') as string,
-          zip: formData.get('zip') as string,
-          participation_level: formData.get('participation_level') as string,
-          description: (formData.get('description') as string) || null,
-        };
-
-        const { data: restaurant, error: rError } = await supabase
-          .from('restaurants')
-          .insert(restaurantData)
-          .select()
-          .single();
-
-        if (rError) throw new Error(rError.message);
-
-        // Insert submission
-        const { data: submission, error: sError } = await supabase
-          .from('submissions')
-          .insert({ restaurant_id: restaurant.id })
-          .select()
-          .single();
-
-        if (sError) throw new Error(sError.message);
-
-        // Insert dishes
-        for (const dish of dishes) {
-          const { error: dError } = await supabase.from('dishes').insert({
-            submission_id: submission.id,
-            restaurant_id: restaurant.id,
-            name: dish.name,
-            category: dish.category,
-            description: dish.description || null,
-            main_element: dish.main_element,
-            supplier_name: dish.supplier_name,
-            supplier_city: dish.supplier_city || null,
-            supplier_state: dish.supplier_state || null,
-            supplier_website: dish.supplier_website || null,
-            supplier_certifications: dish.supplier_certifications || null,
-            meets_non_negotiables: dish.meets_non_negotiables,
-            notes: dish.notes || null,
-          });
-          if (dError) throw new Error(dError.message);
-        }
+      const result = await submitApplication(formData);
+      if (result?.error) {
+        setError(result.error);
       }
-
-      router.push('/apply/success');
     } catch (err) {
+      const digest =
+        typeof err === 'object' && err !== null && 'digest' in err
+          ? String((err as { digest?: unknown }).digest)
+          : '';
+      if (digest.startsWith('NEXT_REDIRECT')) {
+        throw err;
+      }
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setSubmitting(false);
@@ -263,25 +207,6 @@ export default function ApplyPage() {
               <input type="text" name="zip" required={applicantType === 'restaurant'} pattern="[0-9]{5}" className={inputClass} />
             </div>
 
-            {/* Restaurant-only: participation level */}
-            {applicantType === 'restaurant' && (
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Participation Level <span className="text-red-500">*</span>
-                </label>
-                <div className="space-y-2 mt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="participation_level" value="participant" defaultChecked className="text-[#2d6a4f] focus:ring-[#2d6a4f]" />
-                    <span className="text-sm text-stone-700">From the Farm Participant</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="participation_level" value="certified" className="text-[#2d6a4f] focus:ring-[#2d6a4f]" />
-                    <span className="text-sm text-stone-700">MAHA Certified Restaurant</span>
-                  </label>
-                </div>
-              </div>
-            )}
-
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-stone-700 mb-1">
                 Description (optional)
@@ -299,11 +224,52 @@ export default function ApplyPage() {
           </div>
         </div>
 
+        {/* Account password */}
+        <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
+          <h2 className="text-xl font-semibold text-stone-900 mb-2 flex items-center gap-2">
+            <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
+            Create your account
+          </h2>
+          <p className="text-sm text-stone-500 mb-6">
+            Use your contact email to sign in. Choose a password you&apos;ll use to access your dashboard and track your application.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                name="account_password"
+                required
+                autoComplete="new-password"
+                minLength={8}
+                className={inputClass}
+                placeholder="At least 8 characters"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1">
+                Confirm password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                name="account_password_confirm"
+                required
+                autoComplete="new-password"
+                minLength={8}
+                className={inputClass}
+                placeholder="Re-enter password"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Farm-specific fields */}
         {applicantType === 'farm' && (
           <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
             <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
-              <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
+              <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">3</span>
               Farm Details
             </h2>
             <div className="space-y-4">
@@ -362,7 +328,7 @@ export default function ApplyPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
-                <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
+                <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">3</span>
                 Dish Submissions
               </h2>
               <button
@@ -391,9 +357,7 @@ export default function ApplyPage() {
         {/* Attestation */}
         <div className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
           <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
-            <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">
-              {applicantType === 'restaurant' ? '3' : '3'}
-            </span>
+            <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">4</span>
             Attestation
           </h2>
           <div className="space-y-4">

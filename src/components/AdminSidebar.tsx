@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard' },
@@ -11,6 +12,14 @@ const navItems = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  }
 
   return (
     <aside className="bg-[#1b4332] text-white md:w-64 md:min-h-screen flex-shrink-0">
@@ -51,14 +60,32 @@ export default function AdminSidebar() {
         </ul>
       </nav>
 
-      {/* Back to site — desktop only */}
-      <div className="hidden md:block p-4 border-t border-[#2d6a4f]">
+      {/* Back to site + sign out — desktop */}
+      <div className="hidden md:block p-4 border-t border-[#2d6a4f] space-y-2">
         <Link
           href="/"
           className="flex items-center gap-2 text-green-300 hover:text-white text-sm transition-colors"
         >
           ← Back to Site
         </Link>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="w-full text-left text-green-300 hover:text-white text-sm transition-colors"
+        >
+          Sign Out
+        </button>
+      </div>
+
+      {/* Mobile sign out */}
+      <div className="md:hidden p-2 border-t border-[#2d6a4f]">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="w-full px-3 py-2 rounded-lg text-sm text-green-200 hover:bg-[#2d6a4f]/50 hover:text-white transition-colors text-left"
+        >
+          Sign Out
+        </button>
       </div>
     </aside>
   );

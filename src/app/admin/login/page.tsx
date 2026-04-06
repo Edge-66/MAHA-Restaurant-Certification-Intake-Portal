@@ -25,7 +25,15 @@ export default function AdminLoginPage() {
       return;
     }
 
-    router.push('/admin');
+    const { data: profile } = await supabase.from('profiles').select('role').single();
+
+    if (profile?.role === 'restaurant') {
+      router.push('/dashboard/restaurant');
+    } else if (profile?.role === 'farm') {
+      router.push('/dashboard/farm');
+    } else {
+      router.push('/admin');
+    }
     router.refresh();
   }
 

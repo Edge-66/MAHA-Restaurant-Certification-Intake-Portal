@@ -45,13 +45,16 @@ export default function DirectoryMap({ pins, center, zoom }: DirectoryMapProps) 
   const mapInstance = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapActive, setMapActive] = useState(false);
 
   // Initialize map
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
     const map = L.map(mapRef.current, {
-      scrollWheelZoom: true,
+      scrollWheelZoom: !isMobile,
       zoomControl: true,
     }).setView(center || [39.8283, -98.5795], zoom || 4);
 
@@ -114,7 +117,20 @@ export default function DirectoryMap({ pins, center, zoom }: DirectoryMapProps) 
 
   return (
     <div className="relative">
-      <div ref={mapRef} className="w-full h-[500px] rounded-xl border border-stone-200 z-0" />
+      <div ref={mapRef} className="w-full h-[350px] md:h-[500px] rounded-xl border border-stone-200 z-0" />
+      {/* Mobile gesture overlay — tap to activate map, prevents scroll trap */}
+      {!mapActive && (
+        <div
+          className="absolute inset-0 z-[1000] flex items-center justify-center rounded-xl md:hidden"
+          style={{ background: 'rgba(0,0,0,0.15)' }}
+          onTouchStart={(e) => { e.preventDefault(); setMapActive(true); }}
+          onClick={() => setMapActive(true)}
+        >
+          <div className="bg-white/90 rounded-lg px-4 py-2 text-sm font-medium text-stone-700 shadow">
+            Tap to interact with map
+          </div>
+        </div>
+      )}
       {/* Legend */}
       <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg border border-stone-200 px-4 py-3 z-[1000]">
         <div className="flex items-center gap-4 text-xs">

@@ -5,7 +5,7 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative text-white overflow-hidden">
+      <section className="relative text-white overflow-hidden -mt-16">
         <Image
           src="/mahahero.jpg"
           alt="Farm hero background"
@@ -14,7 +14,7 @@ export default function HomePage() {
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-br from-[#1b4332]/85 to-[#2d6a4f]/75" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-40 pb-24 md:pt-48 md:pb-32">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm mb-6">
               <span>Farm-to-Table Certification Program</span>

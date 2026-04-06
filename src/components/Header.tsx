@@ -2,80 +2,96 @@
 
 import Link from 'next/link';
 import { Great_Vibes } from 'next/font/google';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 
 const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400' });
 
+const NAV_ITEMS = [
+  { label: 'Directory', href: '/directory' },
+  { label: 'How It Works', href: '/about-certification' },
+  { label: 'Apply Now', href: '/apply' },
+];
+
 export default function Header() {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const isHome = pathname === '/';
+
+  // Close on route change
+  useEffect(() => { setOpen(false); }, [pathname]);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
 
   return (
-    <header className="bg-white border-b border-stone-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className={`${isHome ? 'absolute' : 'relative'} top-0 left-0 right-0 z-50 border-b ${isHome ? 'bg-transparent border-white/10' : 'bg-[#2d6a4f] border-[#1b4332]'}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex justify-between items-center h-16">
+
+          {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-[#2d6a4f]">
+            <span className="text-xl font-bold text-white">
               MAHA{' '}
-              <span className={`${greatVibes.className} text-2xl font-normal text-stone-600`}>
+              <span className={`${greatVibes.className} text-2xl font-normal text-green-200`}>
                 From the Farm
               </span>
             </span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-6">
-            <Link
-              href="/directory"
-              className="text-stone-600 hover:text-[#2d6a4f] transition-colors text-sm font-medium"
+          {/* Hamburger button — three horizontal lines */}
+          <div ref={menuRef} className="ml-auto">
+            <button
+              onClick={() => setOpen(!open)}
+              aria-label="Toggle menu"
+              aria-expanded={open}
+              className="flex flex-col justify-center gap-[5px] w-10 h-10 rounded-lg hover:bg-white/10 transition-colors px-2"
             >
-              Directory
-            </Link>
-            <Link
-              href="/apply"
-              className="bg-[#2d6a4f] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1b4332] transition-colors"
-            >
-              Apply Now
-            </Link>
-          </nav>
+              <span className="block w-full h-[2px] bg-white rounded-full" />
+              <span className="block w-full h-[2px] bg-white rounded-full" />
+              <span className="block w-full h-[2px] bg-white rounded-full" />
+            </button>
 
-          {/* Mobile hamburger */}
-          <button
-            className="sm:hidden p-2 text-stone-600 hover:text-stone-900 transition-colors"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? (
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+            {/* Dropdown */}
+            {open && (
+              <div className="absolute right-4 sm:right-6 lg:right-8 top-[calc(100%+4px)] w-56 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
+                <nav className="py-2">
+                  {NAV_ITEMS.map(({ label, href }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`block px-4 py-2.5 text-sm font-medium transition-colors ${
+                        pathname === href
+                          ? 'text-[#2d6a4f] bg-[#2d6a4f]/5'
+                          : 'text-stone-700 hover:bg-stone-50 hover:text-stone-900'
+                      }`}
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                  <div className="my-2 border-t border-stone-100" />
+                  <Link
+                    href="/login"
+                    className="block px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50 hover:text-stone-900 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                </nav>
+              </div>
             )}
-          </button>
+          </div>
+
         </div>
       </div>
-
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="sm:hidden border-t border-stone-100 bg-white px-4 py-3 flex flex-col gap-1">
-          <Link
-            href="/directory"
-            onClick={() => setMobileOpen(false)}
-            className="block px-3 py-3 text-sm font-medium text-stone-700 hover:bg-stone-50 rounded-lg transition-colors"
-          >
-            Directory
-          </Link>
-          <Link
-            href="/apply"
-            onClick={() => setMobileOpen(false)}
-            className="block px-3 py-3 text-sm font-medium text-white bg-[#2d6a4f] hover:bg-[#1b4332] rounded-lg text-center transition-colors"
-          >
-            Apply Now
-          </Link>
-        </div>
-      )}
     </header>
   );
 }

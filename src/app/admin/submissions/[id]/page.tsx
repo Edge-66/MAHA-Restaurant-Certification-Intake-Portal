@@ -25,6 +25,7 @@ export default function SubmissionDetailPage() {
   const [saving, setSaving] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [participationLevel, setParticipationLevel] = useState<'participant' | 'certified'>('participant');
 
   const fetchSubmission = useCallback(async () => {
     const supabase = getSupabase();
@@ -38,6 +39,10 @@ export default function SubmissionDetailPage() {
       setSubmission(data as unknown as SubmissionWithDetails);
       setAdminNotes(data.admin_notes || '');
       setSelectedStatus(data.status);
+      const pl = (data as { restaurants?: { participation_level?: string } }).restaurants?.participation_level;
+      if (pl === 'certified' || pl === 'participant') {
+        setParticipationLevel(pl);
+      }
     }
     setLoading(false);
   }, [id]);
@@ -57,6 +62,13 @@ export default function SubmissionDetailPage() {
     };
 
     await supabase.from('submissions').update(updateData).eq('id', id);
+
+    if (submission?.restaurants?.id) {
+      await supabase
+        .from('restaurants')
+        .update({ participation_level: participationLevel })
+        .eq('id', submission.restaurants.id);
+    }
 
     // If approving submission, approve all pending dishes + geocode restaurant
     if (selectedStatus === 'approved' && submission) {
@@ -174,9 +186,17 @@ export default function SubmissionDetailPage() {
               {restaurant.address}, {restaurant.city}, {restaurant.state} {restaurant.zip}
             </span>
           </div>
-          <div>
-            <span className="font-medium text-stone-600">Participation Level:</span>{' '}
-            <span className="text-stone-900 capitalize">{restaurant.participation_level}</span>
+          <div className="sm:col-span-2">
+            <label className="block font-medium text-stone-600 mb-1">Participation level</label>
+            <select
+              value={participationLevel}
+              onChange={(e) => setParticipationLevel(e.target.value as 'participant' | 'certified')}
+              className="border border-stone-300 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent max-w-xs"
+            >
+              <option value="participant">From the Farm Participant</option>
+              <option value="certified">MAHA Certified Restaurant</option>
+            </select>
+            <p className="text-xs text-stone-500 mt-1">Saved when you click &quot;Update Submission&quot; below.</p>
           </div>
           {restaurant.description && (
             <div className="sm:col-span-2">

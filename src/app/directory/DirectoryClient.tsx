@@ -191,12 +191,12 @@ export default function DirectoryClient({ restaurants, farms }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-8 border-b border-stone-200">
+      <div className="flex gap-2 mb-8 border-b border-stone-200 overflow-x-auto scrollbar-none">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px flex-shrink-0 ${
               activeTab === tab.key
                 ? 'border-[#2d6a4f] text-[#2d6a4f]'
                 : 'border-transparent text-stone-500 hover:text-stone-700'

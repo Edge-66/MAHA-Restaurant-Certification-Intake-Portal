@@ -1,75 +1,228 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
 
-export async function submitApplication(formData: FormData) {
-  const supabase = await createClient();
+type DishPayload = {
+  name: string;
+  category: string;
+  description: string | null;
+  main_element: string;
+  supplier_name: string;
+  supplier_city: string | null;
+  supplier_state: string | null;
+  supplier_website: string | null;
+  supplier_certifications: string | null;
+  meets_non_negotiables: boolean;
+  notes: string | null;
+};
 
-  // Extract restaurant data
-  const restaurantData = {
-    name: formData.get('restaurant_name') as string,
-    contact_name: formData.get('contact_name') as string,
-    contact_email: formData.get('contact_email') as string,
-    contact_phone: formData.get('contact_phone') as string,
-    website: (formData.get('website') as string) || null,
-    address: formData.get('address') as string,
-    city: formData.get('city') as string,
-    state: formData.get('state') as string,
-    zip: formData.get('zip') as string,
-    participation_level: formData.get('participation_level') as string,
-    description: (formData.get('description') as string) || null,
-  };
+function isDishPayload(x: unknown): x is DishPayload {
+  if (!x || typeof x !== 'object') return false;
+  const o = x as Record<string, unknown>;
+  return (
+    typeof o.name === 'string' &&
+    typeof o.category === 'string' &&
+    typeof o.main_element === 'string' &&
+    typeof o.supplier_name === 'string' &&
+    typeof o.meets_non_negotiables === 'boolean'
+  );
+}
 
-  // Insert restaurant
-  const { data: restaurant, error: restaurantError } = await supabase
-    .from('restaurants')
-    .insert(restaurantData)
-    .select()
-    .single();
-
-  if (restaurantError || !restaurant) {
-    throw new Error(`Failed to create restaurant: ${restaurantError?.message}`);
+/**
+ * Creates a Supabase Auth user, saves the application, links profiles, and signs the user in.
+ * Requires SUPABASE_SERVICE_ROLE_KEY on the server.
+ */
+export async function submitApplication(
+  formData: FormData
+): Promise<{ error: string } | void> {
+  let userId: string | null = null;
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return {
+      error:
+        'Account signup is not configured (missing SUPABASE_SERVICE_ROLE_KEY). Add it to the server environment.',
+    };
   }
 
-  // Insert submission
-  const { data: submission, error: submissionError } = await supabase
-    .from('submissions')
-    .insert({ restaurant_id: restaurant.id })
-    .select()
-    .single();
+  const applicantType = formData.get('applicant_type') as string;
+  const password = (formData.get('account_password') as string) || '';
+  const emailRaw = (formData.get('contact_email') as string) || '';
+  const email = emailRaw.trim().toLowerCase();
 
-  if (submissionError || !submission) {
-    throw new Error(`Failed to create submission: ${submissionError?.message}`);
+  if (applicantType !== 'restaurant' && applicantType !== 'farm') {
+    return { error: 'Invalid application type.' };
   }
 
-  // Parse dishes from form data
-  const dishesJson = formData.get('dishes') as string;
-  const dishes = JSON.parse(dishesJson);
+  if (password.length < 8) {
+    return { error: 'Password must be at least 8 characters.' };
+  }
 
-  for (const dish of dishes) {
-    const { error: dishError } = await supabase.from('dishes').insert({
-      submission_id: submission.id,
-      restaurant_id: restaurant.id,
-      name: dish.name,
-      category: dish.category,
-      description: dish.description || null,
-      main_element: dish.main_element,
-      supplier_name: dish.supplier_name,
-      supplier_city: dish.supplier_city || null,
-      supplier_state: dish.supplier_state || null,
-      supplier_website: dish.supplier_website || null,
-      supplier_certifications: dish.supplier_certifications || null,
-      meets_non_negotiables: dish.meets_non_negotiables,
-      notes: dish.notes || null,
-    });
+  if (!email) {
+    return { error: 'Contact email is required.' };
+  }
 
-    if (dishError) {
-      throw new Error(`Failed to create dish: ${dishError.message}`);
+  const { data: authData, error: createUserError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+
+  if (createUserError || !authData.user) {
+    const msg = createUserError?.message ?? 'Could not create account.';
+    if (/already|registered|exists/i.test(msg)) {
+      return {
+        error:
+          'An account already exists for this email. Sign in with /login or use a different email.',
+      };
     }
+    return { error: msg };
   }
 
-  redirect('/apply/success');
+  userId = authData.user.id;
+
+  try {
+    if (applicantType === 'farm') {
+      const farmData = {
+        name: formData.get('name') as string,
+        contact_name: formData.get('contact_name') as string,
+        contact_email: emailRaw.trim(),
+        contact_phone: formData.get('contact_phone') as string,
+        website: (formData.get('website') as string) || null,
+        address: (formData.get('address') as string) || null,
+        city: formData.get('city') as string,
+        state: formData.get('state') as string,
+        zip: (formData.get('zip') as string) || null,
+        description: (formData.get('description') as string) || null,
+        livestock_types: (formData.get('livestock_types') as string) || null,
+        produce_types: (formData.get('produce_types') as string) || null,
+        regenerative_practices: (formData.get('regenerative_practices') as string) || null,
+        certifications: (formData.get('certifications') as string) || null,
+      };
+
+      const { data: farm, error: fError } = await admin
+        .from('farms')
+        .insert(farmData)
+        .select('id')
+        .single();
+
+      if (fError || !farm) {
+        throw new Error(fError?.message ?? 'Failed to save farm application.');
+      }
+
+      const { error: pError } = await admin.from('profiles').insert({
+        id: userId,
+        role: 'farm',
+        farm_id: farm.id,
+        restaurant_id: null,
+      });
+
+      if (pError) {
+        throw new Error(pError.message);
+      }
+    } else {
+      let dishes: unknown[];
+      try {
+        dishes = JSON.parse((formData.get('dishes_json') as string) || '[]');
+      } catch {
+        throw new Error('Invalid dish data.');
+      }
+      if (!Array.isArray(dishes) || dishes.length === 0) {
+        throw new Error('Add at least one dish.');
+      }
+      if (!dishes.every(isDishPayload)) {
+        throw new Error('Each dish must include name, category, main element, supplier, and attestations.');
+      }
+
+      const restaurantData = {
+        name: formData.get('name') as string,
+        contact_name: formData.get('contact_name') as string,
+        contact_email: emailRaw.trim(),
+        contact_phone: formData.get('contact_phone') as string,
+        website: (formData.get('website') as string) || null,
+        address: formData.get('address') as string,
+        city: formData.get('city') as string,
+        state: formData.get('state') as string,
+        zip: formData.get('zip') as string,
+        participation_level: 'participant' as const,
+        description: (formData.get('description') as string) || null,
+      };
+
+      const { data: restaurant, error: rError } = await admin
+        .from('restaurants')
+        .insert(restaurantData)
+        .select('id')
+        .single();
+
+      if (rError || !restaurant) {
+        throw new Error(rError?.message ?? 'Failed to save restaurant.');
+      }
+
+      const { data: submission, error: sError } = await admin
+        .from('submissions')
+        .insert({ restaurant_id: restaurant.id })
+        .select('id')
+        .single();
+
+      if (sError || !submission) {
+        throw new Error(sError?.message ?? 'Failed to create submission.');
+      }
+
+      for (const dish of dishes) {
+        const { error: dError } = await admin.from('dishes').insert({
+          submission_id: submission.id,
+          restaurant_id: restaurant.id,
+          name: dish.name,
+          category: dish.category,
+          description: dish.description || null,
+          main_element: dish.main_element,
+          supplier_name: dish.supplier_name,
+          supplier_city: dish.supplier_city || null,
+          supplier_state: dish.supplier_state || null,
+          supplier_website: dish.supplier_website || null,
+          supplier_certifications: dish.supplier_certifications || null,
+          meets_non_negotiables: dish.meets_non_negotiables,
+          notes: dish.notes || null,
+        });
+        if (dError) {
+          throw new Error(dError.message);
+        }
+      }
+
+      const { error: pError } = await admin.from('profiles').insert({
+        id: userId,
+        role: 'restaurant',
+        restaurant_id: restaurant.id,
+        farm_id: null,
+      });
+
+      if (pError) {
+        throw new Error(pError.message);
+      }
+    }
+  } catch (err) {
+    await admin.auth.admin.deleteUser(userId);
+    const message = err instanceof Error ? err.message : 'Something went wrong.';
+    return { error: message };
+  }
+
+  const supabase = await createClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (signInError) {
+    redirect(`/login?applied=1&email=${encodeURIComponent(email)}`);
+  }
+
+  if (applicantType === 'farm') {
+    redirect('/dashboard/farm');
+  }
+  redirect('/dashboard/restaurant');
 }
 
 export async function loginAdmin(formData: FormData) {

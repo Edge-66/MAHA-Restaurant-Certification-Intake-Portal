@@ -29,27 +29,71 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect admin routes (except login)
-  if (
-    request.nextUrl.pathname.startsWith('/admin') &&
-    !request.nextUrl.pathname.startsWith('/admin/login') &&
-    !user
-  ) {
+  const path = request.nextUrl.pathname;
+
+  const redirectTo = (pathname: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = '/admin/login';
+    url.pathname = pathname;
     return NextResponse.redirect(url);
+  };
+
+  async function profileRole(): Promise<string | undefined> {
+    if (!user) return undefined;
+    const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    return data?.role as string | undefined;
   }
 
-  // Redirect authenticated users away from login
-  if (request.nextUrl.pathname === '/admin/login' && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/admin';
-    return NextResponse.redirect(url);
+  // Unified login: skip if not authenticated
+  if (path === '/login') {
+    if (user) {
+      const role = await profileRole();
+      if (role === 'restaurant') return redirectTo('/dashboard/restaurant');
+      if (role === 'farm') return redirectTo('/dashboard/farm');
+      return redirectTo('/admin');
+    }
+    return supabaseResponse;
+  }
+
+  // Role-specific dashboards
+  if (path.startsWith('/dashboard')) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('next', path);
+      return NextResponse.redirect(url);
+    }
+    const role = await profileRole();
+    if (role === 'admin' || !role) {
+      return redirectTo('/admin');
+    }
+    if (path.startsWith('/dashboard/restaurant') && role !== 'restaurant') {
+      if (role === 'farm') return redirectTo('/dashboard/farm');
+      return redirectTo('/admin');
+    }
+    if (path.startsWith('/dashboard/farm') && role !== 'farm') {
+      if (role === 'restaurant') return redirectTo('/dashboard/restaurant');
+      return redirectTo('/admin');
+    }
+    return supabaseResponse;
+  }
+
+  // Admin (legacy /admin/login included)
+  if (path.startsWith('/admin')) {
+    if (!path.startsWith('/admin/login') && !user) {
+      return redirectTo('/admin/login');
+    }
+    if (path.startsWith('/admin/login') && user) {
+      const role = await profileRole();
+      if (role === 'restaurant') return redirectTo('/dashboard/restaurant');
+      if (role === 'farm') return redirectTo('/dashboard/farm');
+      return redirectTo('/admin');
+    }
+    return supabaseResponse;
   }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/dashboard/:path*', '/login'],
 };

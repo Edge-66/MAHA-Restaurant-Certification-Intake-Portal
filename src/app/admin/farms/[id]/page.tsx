@@ -7,6 +7,11 @@ import StatusBadge from '@/components/StatusBadge';
 import type { Farm } from '@/lib/types';
 import { geocodeAddress } from '@/lib/geocode';
 
+function parsePhotoUrls(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
 function getSupabase() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,6 +30,14 @@ export default function AdminFarmDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [editFields, setEditFields] = useState({
+    contact_name: '',
+    contact_email: '',
+    contact_phone: '',
+    website: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
     description: '',
     livestock_types: '',
     produce_types: '',
@@ -44,6 +57,14 @@ export default function AdminFarmDetailPage() {
       setFarm(data as Farm);
       setSelectedStatus(data.status);
       setEditFields({
+        contact_name: data.contact_name || '',
+        contact_email: data.contact_email || '',
+        contact_phone: data.contact_phone || '',
+        website: data.website || '',
+        address: data.address || '',
+        city: data.city || '',
+        state: data.state || '',
+        zip: data.zip || '',
         description: data.description || '',
         livestock_types: data.livestock_types || '',
         produce_types: data.produce_types || '',
@@ -121,7 +142,7 @@ export default function AdminFarmDetailPage() {
     setUploading(true);
 
     const supabase = getSupabase();
-    const currentPhotos: string[] = farm?.photo_urls ? JSON.parse(farm.photo_urls) : [];
+    const currentPhotos: string[] = parsePhotoUrls(farm?.photo_urls);
     const newUrls = [...currentPhotos];
 
     for (const file of Array.from(files)) {
@@ -149,7 +170,7 @@ export default function AdminFarmDetailPage() {
 
   const removeGalleryPhoto = async (urlToRemove: string) => {
     const supabase = getSupabase();
-    const currentPhotos: string[] = farm?.photo_urls ? JSON.parse(farm.photo_urls) : [];
+    const currentPhotos: string[] = parsePhotoUrls(farm?.photo_urls);
     const updated = currentPhotos.filter((u) => u !== urlToRemove);
 
     await supabase.from('farms').update({
@@ -179,7 +200,7 @@ export default function AdminFarmDetailPage() {
     );
   }
 
-  const galleryPhotos: string[] = farm.photo_urls ? JSON.parse(farm.photo_urls) : [];
+  const galleryPhotos = parsePhotoUrls(farm.photo_urls);
 
   return (
     <div className="max-w-4xl">
@@ -199,34 +220,61 @@ export default function AdminFarmDetailPage() {
         <StatusBadge status={farm.status} />
       </div>
 
-      {/* Contact Info */}
+      {/* Contact Info — editable */}
       <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold text-stone-900 mb-4">Contact Information</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <span className="font-medium text-stone-600">Contact:</span>{' '}
-            <span className="text-stone-900">{farm.contact_name}</span>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Contact Name</label>
+            <input type="text" value={editFields.contact_name}
+              onChange={(e) => setEditFields({ ...editFields, contact_name: e.target.value })}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
           </div>
           <div>
-            <span className="font-medium text-stone-600">Email:</span>{' '}
-            <a href={`mailto:${farm.contact_email}`} className="text-[#2d6a4f] hover:underline">{farm.contact_email}</a>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Email</label>
+            <input type="email" value={editFields.contact_email}
+              onChange={(e) => setEditFields({ ...editFields, contact_email: e.target.value })}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
           </div>
           <div>
-            <span className="font-medium text-stone-600">Phone:</span>{' '}
-            <span className="text-stone-900">{farm.contact_phone}</span>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Phone</label>
+            <input type="text" value={editFields.contact_phone}
+              onChange={(e) => setEditFields({ ...editFields, contact_phone: e.target.value })}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
           </div>
-          {farm.website && (
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Website</label>
+            <input type="url" value={editFields.website}
+              onChange={(e) => setEditFields({ ...editFields, website: e.target.value })}
+              placeholder="https://"
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-stone-700 mb-1">Street Address</label>
+            <input type="text" value={editFields.address}
+              onChange={(e) => setEditFields({ ...editFields, address: e.target.value })}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">City</label>
+            <input type="text" value={editFields.city}
+              onChange={(e) => setEditFields({ ...editFields, city: e.target.value })}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <span className="font-medium text-stone-600">Website:</span>{' '}
-              <a href={farm.website} target="_blank" rel="noopener noreferrer" className="text-[#2d6a4f] hover:underline">{farm.website}</a>
+              <label className="block text-sm font-medium text-stone-700 mb-1">State</label>
+              <input type="text" value={editFields.state} maxLength={2}
+                onChange={(e) => setEditFields({ ...editFields, state: e.target.value.toUpperCase() })}
+                className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
             </div>
-          )}
-          {farm.address && (
-            <div className="sm:col-span-2">
-              <span className="font-medium text-stone-600">Address:</span>{' '}
-              <span className="text-stone-900">{farm.address}, {farm.city}, {farm.state} {farm.zip}</span>
+            <div>
+              <label className="block text-sm font-medium text-stone-700 mb-1">ZIP</label>
+              <input type="text" value={editFields.zip}
+                onChange={(e) => setEditFields({ ...editFields, zip: e.target.value })}
+                className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent" />
             </div>
-          )}
+          </div>
         </div>
       </div>
 
