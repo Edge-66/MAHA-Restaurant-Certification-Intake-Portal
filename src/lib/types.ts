@@ -25,6 +25,7 @@ export interface Submission {
   submitted_at: string;
   reviewed_at: string | null;
   reviewer_id: string | null;
+  reviewed_by: string | null;
 }
 
 export interface Dish {
@@ -94,6 +95,7 @@ export interface Farm {
   longitude: number | null;
   status: 'pending' | 'approved' | 'rejected';
   approved_at: string | null;
+  reviewed_by: string | null;
   created_at: string;
   updated_at: string;
 }

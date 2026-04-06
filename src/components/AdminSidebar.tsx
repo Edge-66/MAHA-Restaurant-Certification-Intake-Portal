@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { usePathname } from 'next/navigation';
+import ProfileDropdown from '@/components/ProfileDropdown';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard' },
@@ -10,16 +10,13 @@ const navItems = [
   { href: '/admin/farms', label: 'Farms' },
 ];
 
+const publicItems = [
+  { href: '/directory', label: 'Directory' },
+  { href: '/about-certification', label: 'How It Works' },
+];
+
 export default function AdminSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  }
 
   return (
     <aside className="bg-[#1b4332] text-white md:w-64 md:min-h-screen flex-shrink-0">
@@ -34,7 +31,7 @@ export default function AdminSidebar() {
         </Link>
       </div>
 
-      {/* Nav — horizontal scroll on mobile, vertical on desktop */}
+      {/* Nav */}
       <nav className="p-2 md:flex-1 md:p-4 overflow-x-auto">
         <ul className="flex md:flex-col gap-1 md:space-y-1">
           {navItems.map((item) => {
@@ -60,32 +57,46 @@ export default function AdminSidebar() {
         </ul>
       </nav>
 
-      {/* Back to site + sign out — desktop */}
-      <div className="hidden md:block p-4 border-t border-[#2d6a4f] space-y-2">
+      {/* Public site links — desktop only */}
+      <div className="hidden md:block px-4 pb-2 pt-4 border-t border-[#2d6a4f]">
+        <p className="text-xs font-semibold text-green-500 uppercase tracking-wider mb-2 px-1">Public Site</p>
+        <ul className="space-y-1">
+          {publicItems.map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-green-200 hover:bg-[#2d6a4f]/50 hover:text-white transition-colors"
+              >
+                {item.label}
+                <svg className="w-3 h-3 ml-auto opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Desktop footer */}
+      <div className="hidden md:block p-4 border-t border-[#2d6a4f]">
         <Link
           href="/"
-          className="flex items-center gap-2 text-green-300 hover:text-white text-sm transition-colors"
+          className="flex items-center gap-2 text-green-300 hover:text-white text-sm transition-colors mb-4"
         >
           ← Back to Site
         </Link>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="w-full text-left text-green-300 hover:text-white text-sm transition-colors"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-3">
+          <ProfileDropdown accountHref="/admin/account" variant="dark" dropDirection="up" />
+          <span className="text-xs text-green-400 truncate">Account</span>
+        </div>
       </div>
 
-      {/* Mobile sign out */}
-      <div className="md:hidden p-2 border-t border-[#2d6a4f]">
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="w-full px-3 py-2 rounded-lg text-sm text-green-200 hover:bg-[#2d6a4f]/50 hover:text-white transition-colors text-left"
-        >
-          Sign Out
-        </button>
+      {/* Mobile footer */}
+      <div className="md:hidden p-2 border-t border-[#2d6a4f] flex items-center justify-between px-3">
+        <Link href="/" className="text-sm text-green-200 hover:text-white transition-colors">
+          ← Site
+        </Link>
+        <ProfileDropdown accountHref="/admin/account" variant="dark" dropDirection="up" />
       </div>
     </aside>
   );

@@ -2,21 +2,11 @@
 
 import Link from 'next/link';
 import { Great_Vibes } from 'next/font/google';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import ProfileDropdown from '@/components/ProfileDropdown';
 
 const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400' });
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  }
-
   return (
     <div className="min-h-screen bg-stone-50">
       <header className="bg-white border-b border-stone-200">
@@ -34,12 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               Public Directory
             </Link>
-            <button
-              onClick={handleSignOut}
-              className="text-sm text-stone-500 hover:text-stone-700 transition-colors"
-            >
-              Sign Out
-            </button>
+            <ProfileDropdown accountHref="/dashboard/account" variant="light" dropDirection="down" />
           </div>
         </div>
       </header>

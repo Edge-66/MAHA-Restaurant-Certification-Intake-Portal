@@ -28,6 +28,8 @@ export default function AdminFarmDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminTier, setAdminTier] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [editFields, setEditFields] = useState({
@@ -45,6 +47,20 @@ export default function AdminFarmDetailPage() {
     regenerative_practices: '',
     certifications: '',
   });
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      setAdminEmail(data.user.email ?? '');
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('admin_tier')
+        .eq('id', data.user.id)
+        .single();
+      setAdminTier(profile?.admin_tier ?? 1);
+    });
+  }, []);
 
   const fetchFarm = useCallback(async () => {
     const supabase = getSupabase();
@@ -108,6 +124,7 @@ export default function AdminFarmDetailPage() {
       }
     }
 
+    updateData.reviewed_by = adminEmail || null;
     await supabase.from('farms').update(updateData).eq('id', id);
     await fetchFarm();
     setSaving(false);
@@ -397,30 +414,46 @@ export default function AdminFarmDetailPage() {
       <div className="bg-white border border-stone-200 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-stone-900 mb-4">Status & Actions</h2>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">Farm Status</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
-            >
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-            {selectedStatus === 'approved' && farm.status !== 'approved' && (
-              <p className="text-xs text-green-700 mt-1">
-                Approving will make this farm visible in the public directory.
-              </p>
-            )}
-          </div>
-          <button
-            onClick={handleUpdateStatus}
-            disabled={saving}
-            className="bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#1b4332] transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+          {adminTier >= 2 ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Farm Status</label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                {selectedStatus === 'approved' && farm.status !== 'approved' && (
+                  <p className="text-xs text-green-700 mt-1">
+                    Approving will make this farm visible in the public directory.
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                <button
+                  onClick={handleUpdateStatus}
+                  disabled={saving}
+                  className="bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#1b4332] transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+                {farm.reviewed_by && farm.updated_at && (
+                  <p className="text-xs text-stone-400">
+                    Last updated by <span className="font-medium text-stone-500">{farm.reviewed_by}</span>
+                    {' '}on {new Date(farm.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+              You have <strong>Editor</strong> access. Approving or rejecting farms requires Reviewer (Tier 2) or higher. Contact a Super Admin to adjust your permissions.
+            </div>
+          )}
         </div>
       </div>
     </div>

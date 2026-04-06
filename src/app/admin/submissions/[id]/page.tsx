@@ -23,9 +23,26 @@ export default function SubmissionDetailPage() {
   const [submission, setSubmission] = useState<SubmissionWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [participationLevel, setParticipationLevel] = useState<'participant' | 'certified'>('participant');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminTier, setAdminTier] = useState(1);
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      setAdminEmail(data.user.email ?? '');
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('admin_tier')
+        .eq('id', data.user.id)
+        .single();
+      setAdminTier(profile?.admin_tier ?? 1);
+    });
+  }, []);
 
   const fetchSubmission = useCallback(async () => {
     const supabase = getSupabase();
@@ -59,6 +76,7 @@ export default function SubmissionDetailPage() {
       status: selectedStatus,
       admin_notes: adminNotes,
       reviewed_at: new Date().toISOString(),
+      reviewed_by: adminEmail || null,
     };
 
     await supabase.from('submissions').update(updateData).eq('id', id);
@@ -95,6 +113,8 @@ export default function SubmissionDetailPage() {
 
     await fetchSubmission();
     setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleDishAction = async (dishId: string, status: 'approved' | 'rejected') => {
@@ -132,6 +152,11 @@ export default function SubmissionDetailPage() {
 
   return (
     <div className="max-w-4xl">
+      {saved && (
+        <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg text-sm font-medium">
+          Changes saved successfully.
+        </div>
+      )}
       <button
         onClick={() => router.push('/admin/submissions')}
         className="text-sm text-[#2d6a4f] hover:underline mb-6 inline-block"
@@ -216,40 +241,42 @@ export default function SubmissionDetailPage() {
           {dishes.map((dish) => (
             <div key={dish.id}>
               <DishCard dish={dish} showStatus />
-              <div className="flex gap-2 mt-2 ml-1">
-                {dish.status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => handleDishAction(dish.id, 'approved')}
-                      className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                    >
-                      Approve Dish
-                    </button>
+              {adminTier >= 2 && (
+                <div className="flex gap-2 mt-2 ml-1">
+                  {dish.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => handleDishAction(dish.id, 'approved')}
+                        className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                      >
+                        Approve Dish
+                      </button>
+                      <button
+                        onClick={() => handleDishAction(dish.id, 'rejected')}
+                        className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                      >
+                        Reject Dish
+                      </button>
+                    </>
+                  )}
+                  {dish.status === 'approved' && (
                     <button
                       onClick={() => handleDishAction(dish.id, 'rejected')}
-                      className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                      className="text-xs px-3 py-1.5 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors font-medium"
                     >
-                      Reject Dish
+                      Revoke Approval
                     </button>
-                  </>
-                )}
-                {dish.status === 'approved' && (
-                  <button
-                    onClick={() => handleDishAction(dish.id, 'rejected')}
-                    className="text-xs px-3 py-1.5 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors font-medium"
-                  >
-                    Revoke Approval
-                  </button>
-                )}
-                {dish.status === 'rejected' && (
-                  <button
-                    onClick={() => handleDishAction(dish.id, 'approved')}
-                    className="text-xs px-3 py-1.5 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors font-medium"
-                  >
-                    Approve Instead
-                  </button>
-                )}
-              </div>
+                  )}
+                  {dish.status === 'rejected' && (
+                    <button
+                      onClick={() => handleDishAction(dish.id, 'approved')}
+                      className="text-xs px-3 py-1.5 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors font-medium"
+                    >
+                      Approve Instead
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -294,45 +321,61 @@ export default function SubmissionDetailPage() {
         <h2 className="text-lg font-semibold text-stone-900 mb-4">Admin Actions</h2>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">Internal Notes</label>
-            <textarea
-              value={adminNotes}
-              onChange={(e) => setAdminNotes(e.target.value)}
-              rows={4}
-              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
-              placeholder="Add internal notes about this submission..."
-            />
-          </div>
+          {adminTier >= 2 ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Internal Notes</label>
+                <textarea
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  rows={4}
+                  className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
+                  placeholder="Add internal notes about this submission..."
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Submission Status
-            </label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
-            >
-              <option value="pending">Pending</option>
-              <option value="needs_clarification">Needs Clarification</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-            {selectedStatus === 'approved' && (
-              <p className="text-xs text-stone-500 mt-1">
-                Approving the submission will also approve all pending dishes.
-              </p>
-            )}
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Submission Status
+                </label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="needs_clarification">Needs Clarification</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                {selectedStatus === 'approved' && (
+                  <p className="text-xs text-stone-500 mt-1">
+                    Approving the submission will also approve all pending dishes.
+                  </p>
+                )}
+              </div>
 
-          <button
-            onClick={handleUpdateStatus}
-            disabled={saving}
-            className="bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#1b4332] transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Update Submission'}
-          </button>
+              <div className="flex items-center gap-4 flex-wrap">
+                <button
+                  onClick={handleUpdateStatus}
+                  disabled={saving}
+                  className="bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#1b4332] transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Update Submission'}
+                </button>
+                {submission.reviewed_by && submission.reviewed_at && (
+                  <p className="text-xs text-stone-400">
+                    Last reviewed by <span className="font-medium text-stone-500">{submission.reviewed_by}</span>
+                    {' '}on {new Date(submission.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+              You have <strong>Editor</strong> access. Approving or rejecting submissions requires Reviewer (Tier 2) or higher. Contact a Super Admin to adjust your permissions.
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -245,6 +245,125 @@ export async function logoutAdmin() {
   redirect('/admin/login');
 }
 
+export async function getAdminUsers(): Promise<{ id: string; email: string; tier: number }[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('admin_tier')
+    .eq('id', user.id)
+    .single();
+
+  if ((callerProfile?.admin_tier ?? 1) < 3) return [];
+
+  const { data: adminProfiles } = await supabase
+    .from('profiles')
+    .select('id, admin_tier')
+    .eq('role', 'admin');
+
+  if (!adminProfiles?.length) return [];
+
+  const admin = createAdminClient();
+  const results = await Promise.all(
+    adminProfiles.map(async (p) => {
+      const { data } = await admin.auth.admin.getUserById(p.id);
+      return { id: p.id, email: data.user?.email ?? '', tier: p.admin_tier ?? 1 };
+    })
+  );
+
+  return results.filter((u) => u.email);
+}
+
+export async function updateAdminTier(
+  targetId: string,
+  newTier: number
+): Promise<{ error?: string }> {
+  if (newTier < 1 || newTier > 3) return { error: 'Invalid tier.' };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('admin_tier')
+    .eq('id', user.id)
+    .single();
+
+  if ((callerProfile?.admin_tier ?? 1) < 3) return { error: 'Insufficient permissions.' };
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ admin_tier: newTier })
+    .eq('id', targetId)
+    .eq('role', 'admin');
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+type ContactFields = {
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  website: string | null;
+};
+
+export async function updateRestaurantContact(
+  restaurantId: string,
+  fields: ContactFields
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  // Verify caller owns this restaurant
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('restaurant_id')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.restaurant_id !== restaurantId) return { error: 'Unauthorized.' };
+
+  const { error } = await supabase
+    .from('restaurants')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('id', restaurantId);
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function updateFarmContact(
+  farmId: string,
+  fields: ContactFields
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('farm_id')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.farm_id !== farmId) return { error: 'Unauthorized.' };
+
+  const { error } = await supabase
+    .from('farms')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('id', farmId);
+
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function updateSubmissionStatus(
   submissionId: string,
   status: string,
