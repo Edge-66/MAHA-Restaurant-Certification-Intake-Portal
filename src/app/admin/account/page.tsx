@@ -98,11 +98,14 @@ export default function AdminAccountPage() {
       ]);
 
       const items: ActivityItem[] = [];
-      (subs ?? []).forEach((s: { status: string; reviewed_at: string | null; restaurants: { name?: string } | null }) => {
+      (subs ?? []).forEach((s: { status: string; reviewed_at: string | null; restaurants: { name?: string } | { name?: string }[] | null }) => {
         if (!s.reviewed_at) return;
+        const restaurantName = Array.isArray(s.restaurants)
+          ? s.restaurants[0]?.name
+          : (s.restaurants as { name?: string } | null)?.name;
         items.push({
           type: 'submission',
-          label: `Reviewed submission — ${(s.restaurants as { name?: string } | null)?.name ?? 'Unknown Restaurant'}`,
+          label: `Reviewed submission — ${restaurantName ?? 'Unknown Restaurant'}`,
           status: s.status,
           date: s.reviewed_at,
         });
