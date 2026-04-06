@@ -33,8 +33,7 @@ export default function Reveal({ children, className = '', delay = 0, as: Tag = 
   }, [delay]);
 
   return (
-    // @ts-expect-error — polymorphic ref
-    <Tag ref={ref} className={`reveal ${className}`}>
+    <Tag ref={ref as never} className={`reveal ${className}`}>
       {children}
     </Tag>
   );
