@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import type { ElementType } from 'react';
 
 interface RevealProps {
   children: React.ReactNode;
   className?: string;
   delay?: number; // ms — use for staggered children
-  as?: keyof JSX.IntrinsicElements;
+  as?: ElementType;
 }
 
 export default function Reveal({ children, className = '', delay = 0, as: Tag = 'div' }: RevealProps) {
