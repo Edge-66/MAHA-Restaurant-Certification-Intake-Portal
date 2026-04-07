@@ -18,6 +18,7 @@ const emptyDish: DishFormData = {
   supplier_certifications: '',
   main_element_cert_type: '',
   main_element_cert_other: '',
+  cert_file_url: '',
   meets_non_negotiables: false,
   notes: '',
 };

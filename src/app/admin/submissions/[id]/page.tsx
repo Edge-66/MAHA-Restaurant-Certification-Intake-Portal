@@ -279,6 +279,20 @@ export default function SubmissionDetailPage() {
                 );
                 return null;
               })()}
+              {/* Cert document link */}
+              {(() => {
+                const certUrl = (dish as typeof dish & { cert_file_url?: string | null }).cert_file_url;
+                if (!certUrl) return null;
+                const isPdf = certUrl.toLowerCase().includes('.pdf');
+                return (
+                  <div className="mt-1.5 flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
+                    <svg className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
+                    <a href={certUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2d6a4f] hover:underline font-medium">
+                      {isPdf ? 'View certification PDF' : 'View certification document'}
+                    </a>
+                  </div>
+                );
+              })()}
               {adminTier >= 2 && (
                 <div className="flex gap-2 mt-2 ml-1">
                   {dish.status === 'pending' && (

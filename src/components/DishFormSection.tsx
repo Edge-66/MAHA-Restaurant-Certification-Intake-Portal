@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { DishFormData, DISH_CATEGORIES, US_STATES, US_STATE_NAMES } from '@/lib/types';
+import { uploadCertFile } from '@/lib/actions';
 
 interface DishFormSectionProps {
   index: number;
@@ -13,9 +15,29 @@ interface DishFormSectionProps {
 const input = 'w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent outline-none';
 
 export default function DishFormSection({ index, dish, onChange, onRemove, canRemove }: DishFormSectionProps) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
   const update = (field: keyof DishFormData, value: string | boolean) => {
     onChange(index, { ...dish, [field]: value });
   };
+
+  async function handleCertFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError('');
+    update('cert_file_url', '');
+    const fd = new FormData();
+    fd.append('file', file);
+    const result = await uploadCertFile(fd);
+    if (result.error) {
+      setUploadError(result.error);
+    } else if (result.url) {
+      update('cert_file_url', result.url);
+    }
+    setUploading(false);
+  }
 
   const isUsda = dish.main_element_cert_type === 'usda_organic';
   const hasNoCert = dish.main_element_cert_type === 'none';
@@ -202,6 +224,38 @@ export default function DishFormSection({ index, dish, onChange, onRemove, canRe
                   className={input}
                   placeholder="Enter the full name of the certification"
                 />
+              </div>
+            )}
+
+            {/* Cert document upload — shown for all non-USDA, non-none selections */}
+            {(dish.main_element_cert_type === 'aga' || dish.main_element_cert_type === 'raa' || dish.main_element_cert_type === 'other') && (
+              <div className="pt-2">
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Upload certification document <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-stone-500 mb-2">Accepted formats: JPEG, PNG, PDF — max 10 MB</p>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.pdf"
+                  onChange={handleCertFileChange}
+                  disabled={uploading}
+                  className="block w-full text-sm text-stone-600 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#2d6a4f]/10 file:text-[#2d6a4f] hover:file:bg-[#2d6a4f]/20 disabled:opacity-50"
+                />
+                {uploading && (
+                  <p className="text-xs text-stone-400 mt-1.5 flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
+                    Uploading…
+                  </p>
+                )}
+                {uploadError && (
+                  <p className="text-xs text-red-600 mt-1.5">{uploadError}</p>
+                )}
+                {dish.cert_file_url && !uploading && (
+                  <p className="text-xs text-emerald-700 mt-1.5 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    Document uploaded successfully.
+                  </p>
+                )}
               </div>
             )}
 

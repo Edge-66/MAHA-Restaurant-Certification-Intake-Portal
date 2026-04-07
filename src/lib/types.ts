@@ -114,6 +114,7 @@ export interface DishFormData {
   supplier_certifications: string;
   main_element_cert_type: 'usda_organic' | 'aga' | 'raa' | 'other' | 'none' | '';
   main_element_cert_other: string;
+  cert_file_url: string;
   meets_non_negotiables: boolean;
   notes: string;
 }

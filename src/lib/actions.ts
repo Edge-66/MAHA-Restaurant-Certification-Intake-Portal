@@ -16,6 +16,7 @@ type DishPayload = {
   supplier_certifications: string | null;
   main_element_cert_type: string | null;
   main_element_cert_other: string | null;
+  cert_file_url: string | null;
   meets_non_negotiables: boolean;
   notes: string | null;
 };
@@ -189,6 +190,7 @@ export async function submitApplication(
           main_element_cert_type: dish.main_element_cert_type || null,
           main_element_cert_other: dish.main_element_cert_other || null,
           meets_non_negotiables: dish.meets_non_negotiables,
+          cert_file_url: dish.cert_file_url || null,
           notes: dish.notes || null,
         });
         if (dError) {
@@ -227,6 +229,41 @@ export async function submitApplication(
     redirect('/dashboard/farm');
   }
   redirect('/dashboard/restaurant');
+}
+
+export async function uploadCertFile(
+  formData: FormData
+): Promise<{ url?: string; error?: string }> {
+  const file = formData.get('file') as File | null;
+  if (!file || file.size === 0) return { error: 'No file provided.' };
+
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  if (!allowedTypes.includes(file.type)) {
+    return { error: 'Only JPEG, PNG, WEBP, or PDF files are accepted.' };
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    return { error: 'File must be under 10 MB.' };
+  }
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: 'Storage not configured.' };
+  }
+
+  const ext = file.name.split('.').pop() ?? 'bin';
+  const path = `cert-docs/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const arrayBuffer = await file.arrayBuffer();
+
+  const { error: uploadError } = await admin.storage
+    .from('certifications')
+    .upload(path, arrayBuffer, { contentType: file.type, upsert: false });
+
+  if (uploadError) return { error: uploadError.message };
+
+  const { data } = admin.storage.from('certifications').getPublicUrl(path);
+  return { url: data.publicUrl };
 }
 
 export async function loginAdmin(formData: FormData) {
