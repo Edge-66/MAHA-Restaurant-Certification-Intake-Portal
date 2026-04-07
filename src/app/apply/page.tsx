@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import DishFormSection from '@/components/DishFormSection';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
 import { submitApplication } from '@/lib/actions';
-import Reveal from '@/components/Reveal';
 
 const emptyDish: DishFormData = {
   name: '',
@@ -23,11 +22,22 @@ const emptyDish: DishFormData = {
   notes: '',
 };
 
+const STEPS = [
+  { label: 'Type' },
+  { label: 'Info' },
+  { label: 'Account' },
+  { label: 'Details' },
+  { label: 'Review' },
+];
+
 export default function ApplyPage() {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [step, setStep] = useState(0);
   const [applicantType, setApplicantType] = useState<'restaurant' | 'farm'>('restaurant');
   const [dishes, setDishes] = useState<DishFormData[]>([{ ...emptyDish }]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [stepError, setStepError] = useState('');
 
   const [attestations, setAttestations] = useState({
     accurate: false,
@@ -35,6 +45,63 @@ export default function ApplyPage() {
     verification: false,
     revocation: false,
   });
+
+  const allAttested = Object.values(attestations).every(Boolean);
+
+  // ─── Step validation ───────────────────────────────────────────────────────
+  function validateStep(s: number): string {
+    const form = formRef.current;
+    if (!form) return '';
+
+    function val(name: string) {
+      return ((form.elements.namedItem(name) as HTMLInputElement | null)?.value ?? '').trim();
+    }
+
+    if (s === 1) {
+      const required = ['name', 'contact_name', 'contact_email', 'contact_phone', 'city', 'state'];
+      if (applicantType === 'restaurant') required.push('address', 'zip');
+      for (const f of required) {
+        if (!val(f)) return `Please fill in all required fields.`;
+      }
+      const email = val('contact_email');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address.';
+    }
+
+    if (s === 2) {
+      const pw = val('account_password');
+      const confirm = val('account_password_confirm');
+      if (pw.length < 8) return 'Password must be at least 8 characters.';
+      if (pw !== confirm) return 'Passwords do not match.';
+    }
+
+    if (s === 3 && applicantType === 'restaurant') {
+      for (const dish of dishes) {
+        if (!dish.name.trim()) return 'Each dish must have a name.';
+        if (!dish.main_element.trim()) return 'Each dish must have a main element.';
+        if (!dish.supplier_name.trim()) return 'Each dish must have a supplier name.';
+        if (!dish.main_element_cert_type) return 'Please answer the certification question for each dish.';
+        if (dish.main_element_cert_type === 'other' && !dish.main_element_cert_other.trim()) {
+          return 'Please enter the certification name for the "Other" option.';
+        }
+      }
+    }
+
+    return '';
+  }
+
+  function handleNext() {
+    const err = validateStep(step);
+    if (err) { setStepError(err); return; }
+    setStepError('');
+    setStep((s) => s + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleBack() {
+    setStepError('');
+    setStep((s) => s - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   const handleDishChange = (index: number, dish: DishFormData) => {
     const updated = [...dishes];
@@ -45,388 +112,322 @@ export default function ApplyPage() {
   const addDish = () => setDishes([...dishes, { ...emptyDish }]);
   const removeDish = (index: number) => setDishes(dishes.filter((_, i) => i !== index));
 
-  const allAttested = Object.values(attestations).every(Boolean);
-
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!allAttested) {
-      setError('Please agree to all attestation statements.');
-      return;
-    }
-
-    const form = e.currentTarget;
-    const pw = (form.elements.namedItem('account_password') as HTMLInputElement)?.value ?? '';
-    const pwConfirm = (form.elements.namedItem('account_password_confirm') as HTMLInputElement)?.value ?? '';
-
-    if (pw.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (pw !== pwConfirm) {
-      setError('Password and confirmation do not match.');
-      return;
-    }
+    if (!allAttested) { setError('Please agree to all attestation statements.'); return; }
 
     setSubmitting(true);
     setError('');
 
-    const formData = new FormData(form);
+    const formData = new FormData(e.currentTarget);
     formData.set('applicant_type', applicantType);
     formData.set('dishes_json', JSON.stringify(dishes));
 
     try {
       const result = await submitApplication(formData);
-      if (result?.error) {
-        setError(result.error);
-      }
+      if (result?.error) setError(result.error);
     } catch (err) {
-      const digest =
-        typeof err === 'object' && err !== null && 'digest' in err
-          ? String((err as { digest?: unknown }).digest)
-          : '';
-      if (digest.startsWith('NEXT_REDIRECT')) {
-        throw err;
-      }
+      const digest = typeof err === 'object' && err !== null && 'digest' in err
+        ? String((err as { digest?: unknown }).digest) : '';
+      if (digest.startsWith('NEXT_REDIRECT')) throw err;
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setSubmitting(false);
     }
   }
 
-  const inputClass = 'w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent outline-none';
+  const inp = 'w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent outline-none';
+
+  // ─── Progress Bar ──────────────────────────────────────────────────────────
+  const ProgressBar = () => (
+    <div className="mb-10">
+      <div className="flex items-center justify-between relative">
+        {/* Connector line */}
+        <div className="absolute left-0 right-0 top-4 h-0.5 bg-stone-200 -z-0" />
+        <div
+          className="absolute left-0 top-4 h-0.5 bg-[#2d6a4f] transition-all duration-500 -z-0"
+          style={{ width: `${(step / (STEPS.length - 1)) * 100}%` }}
+        />
+        {STEPS.map((s, i) => {
+          const done = i < step;
+          const active = i === step;
+          return (
+            <div key={i} className="flex flex-col items-center gap-1.5 z-10">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300 ${
+                done ? 'bg-[#2d6a4f] border-[#2d6a4f] text-white'
+                  : active ? 'bg-white border-[#2d6a4f] text-[#2d6a4f]'
+                  : 'bg-white border-stone-300 text-stone-400'
+              }`}>
+                {done
+                  ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  : i + 1}
+              </div>
+              <span className={`text-xs font-medium hidden sm:block ${active ? 'text-[#2d6a4f]' : done ? 'text-stone-500' : 'text-stone-400'}`}>
+                {s.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-stone-900 mb-2">Apply for Certification</h1>
-        <p className="text-stone-600">
-          Complete the form below to apply for the MAHA From the Farm program.
-        </p>
+        <h1 className="text-3xl font-bold text-stone-900 mb-1">Apply for Certification</h1>
+        <p className="text-stone-500 text-sm">Complete the steps below to apply for the MAHA From the Farm program.</p>
       </div>
 
+      <ProgressBar />
+
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>
+      )}
+      {stepError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-6 text-sm">{stepError}</div>
       )}
 
-      {/* Applicant Type Toggle */}
-      <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
-        <h2 className="text-xl font-semibold text-stone-900 mb-4">I am applying as a...</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => setApplicantType('restaurant')}
-            className={`p-4 rounded-xl border-2 text-left transition-all ${
-              applicantType === 'restaurant'
-                ? 'border-[#2d6a4f] bg-[#2d6a4f]/5'
-                : 'border-stone-200 hover:border-stone-300'
-            }`}
-          >
-            <div className="font-semibold text-stone-900 mb-1">Restaurant</div>
-            <p className="text-xs text-stone-500">
-              I serve dishes sourced from verified farms and want to certify them.
-            </p>
-          </button>
-          <button
-            type="button"
-            onClick={() => setApplicantType('farm')}
-            className={`p-4 rounded-xl border-2 text-left transition-all ${
-              applicantType === 'farm'
-                ? 'border-[#2d6a4f] bg-[#2d6a4f]/5'
-                : 'border-stone-200 hover:border-stone-300'
-            }`}
-          >
-            <div className="font-semibold text-stone-900 mb-1">Farm / Producer</div>
-            <p className="text-xs text-stone-500">
-              I raise livestock or grow produce and want to join the MAHA network.
-            </p>
-          </button>
-        </div>
-      </Reveal>
+      <form ref={formRef} onSubmit={handleSubmit}>
 
-      <form onSubmit={handleSubmit}>
-        {/* Section 1: Basic Info (shared) */}
-        <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
-          <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
-            <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">1</span>
-            {applicantType === 'restaurant' ? 'Restaurant' : 'Farm'} Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                {applicantType === 'restaurant' ? 'Restaurant' : 'Farm'} Name <span className="text-red-500">*</span>
-              </label>
-              <input type="text" name="name" required className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Contact Name <span className="text-red-500">*</span>
-              </label>
-              <input type="text" name="contact_name" required className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Contact Email <span className="text-red-500">*</span>
-              </label>
-              <input type="email" name="contact_email" required className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Contact Phone <span className="text-red-500">*</span>
-              </label>
-              <input type="tel" name="contact_phone" required className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Website</label>
-              <input type="url" name="website" className={inputClass} placeholder="https://" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Street Address {applicantType === 'restaurant' && <span className="text-red-500">*</span>}
-              </label>
-              <input type="text" name="address" required={applicantType === 'restaurant'} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                City <span className="text-red-500">*</span>
-              </label>
-              <input type="text" name="city" required className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                State <span className="text-red-500">*</span>
-              </label>
-              <select name="state" required className={inputClass}>
-                <option value="">Select state</option>
-                {US_STATES.map((st) => (
-                  <option key={st} value={st}>{US_STATE_NAMES[st]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                ZIP Code {applicantType === 'restaurant' && <span className="text-red-500">*</span>}
-              </label>
-              <input type="text" name="zip" required={applicantType === 'restaurant'} pattern="[0-9]{5}" className={inputClass} />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Description (optional)
-              </label>
-              <textarea
-                name="description"
-                rows={3}
-                className={inputClass}
-                placeholder={applicantType === 'restaurant'
-                  ? 'Tell us about your restaurant and your commitment to local sourcing...'
-                  : 'Tell us about your farm, what you raise or grow, and your farming philosophy...'
-                }
-              />
-            </div>
-          </div>
-        </Reveal>
-
-        {/* Account password */}
-        <Reveal delay={60} className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
-          <h2 className="text-xl font-semibold text-stone-900 mb-2 flex items-center gap-2">
-            <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
-            Create your account
-          </h2>
-          <p className="text-sm text-stone-500 mb-6">
-            Use your contact email to sign in. Choose a password you&apos;ll use to access your dashboard and track your application.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                name="account_password"
-                required
-                autoComplete="new-password"
-                minLength={8}
-                className={inputClass}
-                placeholder="At least 8 characters"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Confirm password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                name="account_password_confirm"
-                required
-                autoComplete="new-password"
-                minLength={8}
-                className={inputClass}
-                placeholder="Re-enter password"
-              />
-            </div>
-          </div>
-        </Reveal>
-
-        {/* Farm-specific fields */}
-        {applicantType === 'farm' && (
-          <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
-            <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
-              <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">3</span>
-              Farm Details
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Livestock Types
-                </label>
-                <input
-                  type="text"
-                  name="livestock_types"
-                  className={inputClass}
-                  placeholder="e.g. Cattle, Poultry, Pigs, Sheep (comma-separated)"
-                />
-                <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Produce Types
-                </label>
-                <input
-                  type="text"
-                  name="produce_types"
-                  className={inputClass}
-                  placeholder="e.g. Vegetables, Herbs, Fruit, Grains (comma-separated)"
-                />
-                <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Regenerative / Sustainable Practices
-                </label>
-                <textarea
-                  name="regenerative_practices"
-                  rows={3}
-                  className={inputClass}
-                  placeholder="e.g. Rotational grazing, Cover cropping, No-till, Composting (comma-separated)"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Certifications
-                </label>
-                <input
-                  type="text"
-                  name="certifications"
-                  className={inputClass}
-                  placeholder="e.g. USDA Organic, Certified Humane, Animal Welfare Approved (comma-separated)"
-                />
-              </div>
-            </div>
-          </Reveal>
-        )}
-
-        {/* Restaurant-specific: Dish Submissions */}
-        {applicantType === 'restaurant' && (
-          <Reveal className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-stone-900 flex items-center gap-2">
-                <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">3</span>
-                Dish Submissions
-              </h2>
-              <button
-                type="button"
-                onClick={addDish}
-                className="text-[#2d6a4f] hover:text-[#1b4332] text-sm font-medium flex items-center gap-1"
-              >
-                <span className="text-lg">+</span> Add Another Dish
-              </button>
-            </div>
-            <div className="space-y-6">
-              {dishes.map((dish, index) => (
-                <DishFormSection
-                  key={index}
-                  index={index}
-                  dish={dish}
-                  onChange={handleDishChange}
-                  onRemove={removeDish}
-                  canRemove={dishes.length > 1}
-                />
+        {/* ── Step 0: Type ─────────────────────────────────────────────────── */}
+        <div className={step === 0 ? '' : 'hidden'}>
+          <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold text-stone-900 mb-2">I am applying as a…</h2>
+            <p className="text-sm text-stone-500 mb-5">Choose the option that best describes you.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {(['restaurant', 'farm'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setApplicantType(t)}
+                  className={`p-5 rounded-xl border-2 text-left transition-all ${
+                    applicantType === t ? 'border-[#2d6a4f] bg-[#2d6a4f]/5' : 'border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${applicantType === t ? 'bg-[#2d6a4f]/10' : 'bg-stone-100'}`}>
+                    {t === 'restaurant'
+                      ? <svg className={`w-5 h-5 ${applicantType === t ? 'text-[#2d6a4f]' : 'text-stone-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
+                      : <svg className={`w-5 h-5 ${applicantType === t ? 'text-[#2d6a4f]' : 'text-stone-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3c-1.2 5.4-5 7.8-5 11a5 5 0 0 0 10 0c0-3.2-3.8-5.6-5-11Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 14v4" /></svg>
+                    }
+                  </div>
+                  <div className="font-semibold text-stone-900 mb-1 capitalize">{t === 'farm' ? 'Farm / Producer' : 'Restaurant'}</div>
+                  <p className="text-xs text-stone-500">
+                    {t === 'restaurant'
+                      ? 'I serve dishes sourced from verified farms and want to certify them.'
+                      : 'I raise livestock or grow produce and want to join the MAHA network.'}
+                  </p>
+                </button>
               ))}
             </div>
-          </Reveal>
-        )}
-
-        {/* Attestation */}
-        <Reveal className="bg-white border border-stone-200 rounded-xl p-6 mb-8">
-          <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
-            <span className="bg-[#2d6a4f] text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">4</span>
-            Attestation
-          </h2>
-          <div className="space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={attestations.accurate}
-                onChange={(e) => setAttestations({ ...attestations, accurate: e.target.checked })}
-                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-[#2d6a4f] focus:ring-[#2d6a4f]"
-              />
-              <span className="text-sm text-stone-700">
-                I attest that all information provided in this application is accurate and truthful
-                to the best of my knowledge.
-              </span>
-            </label>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={attestations.mainElement}
-                onChange={(e) => setAttestations({ ...attestations, mainElement: e.target.checked })}
-                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-[#2d6a4f] focus:ring-[#2d6a4f]"
-              />
-              <span className="text-sm text-stone-700">
-                {applicantType === 'restaurant'
-                  ? 'I understand that certification applies to the main element of each dish only, and does not necessarily extend to all ingredients.'
-                  : 'I understand that MAHA certification is dish-specific and applies to the main element sourced from our farm.'}
-              </span>
-            </label>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={attestations.verification}
-                onChange={(e) => setAttestations({ ...attestations, verification: e.target.checked })}
-                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-[#2d6a4f] focus:ring-[#2d6a4f]"
-              />
-              <span className="text-sm text-stone-700">
-                I understand that MAHA may conduct additional verification of the claims made in
-                this application, including contacting suppliers or farms directly.
-              </span>
-            </label>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={attestations.revocation}
-                onChange={(e) => setAttestations({ ...attestations, revocation: e.target.checked })}
-                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-[#2d6a4f] focus:ring-[#2d6a4f]"
-              />
-              <span className="text-sm text-stone-700">
-                I understand that certification may be revoked if any claims are found to be
-                inaccurate or if practices change without notification.
-              </span>
-            </label>
           </div>
-        </Reveal>
+        </div>
 
-        <div className="flex justify-end">
+        {/* ── Step 1: Info ──────────────────────────────────────────────────── */}
+        <div className={step === 1 ? '' : 'hidden'}>
+          <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold text-stone-900 mb-5">
+              {applicantType === 'restaurant' ? 'Restaurant' : 'Farm'} Information
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  {applicantType === 'restaurant' ? 'Restaurant' : 'Farm'} Name <span className="text-red-500">*</span>
+                </label>
+                <input type="text" name="name" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Contact Name <span className="text-red-500">*</span></label>
+                <input type="text" name="contact_name" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Contact Email <span className="text-red-500">*</span></label>
+                <input type="email" name="contact_email" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Phone <span className="text-red-500">*</span></label>
+                <input type="tel" name="contact_phone" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Website</label>
+                <input type="url" name="website" className={inp} placeholder="https://" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Street Address {applicantType === 'restaurant' && <span className="text-red-500">*</span>}
+                </label>
+                <input type="text" name="address" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">City <span className="text-red-500">*</span></label>
+                <input type="text" name="city" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">State <span className="text-red-500">*</span></label>
+                <select name="state" className={inp}>
+                  <option value="">Select state</option>
+                  {US_STATES.map((st) => <option key={st} value={st}>{US_STATE_NAMES[st]}</option>)}
+                </select>
+              </div>
+              {applicantType === 'restaurant' && (
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">ZIP Code <span className="text-red-500">*</span></label>
+                  <input type="text" name="zip" pattern="[0-9]{5}" className={inp} />
+                </div>
+              )}
+              <div className={applicantType === 'restaurant' ? '' : 'md:col-span-2'}>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Description</label>
+                <textarea
+                  name="description"
+                  rows={3}
+                  className={inp}
+                  placeholder={applicantType === 'restaurant'
+                    ? 'Tell us about your restaurant and your commitment to local sourcing…'
+                    : 'Tell us about your farm and farming philosophy…'}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Step 2: Account ───────────────────────────────────────────────── */}
+        <div className={step === 2 ? '' : 'hidden'}>
+          <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold text-stone-900 mb-1">Create Your Account</h2>
+            <p className="text-sm text-stone-500 mb-6">
+              Use your contact email to sign in and track your application from your dashboard.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Password <span className="text-red-500">*</span></label>
+                <input type="password" name="account_password" autoComplete="new-password" className={inp} placeholder="At least 8 characters" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Confirm Password <span className="text-red-500">*</span></label>
+                <input type="password" name="account_password_confirm" autoComplete="new-password" className={inp} placeholder="Re-enter password" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Step 3: Details ───────────────────────────────────────────────── */}
+        <div className={step === 3 ? '' : 'hidden'}>
+          {applicantType === 'restaurant' ? (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-xl font-semibold text-stone-900">Dish Submissions</h2>
+                  <p className="text-sm text-stone-500 mt-0.5">Add each dish you'd like to certify.</p>
+                </div>
+                <button type="button" onClick={addDish} className="flex items-center gap-1.5 text-sm font-medium text-[#2d6a4f] hover:text-[#1b4332]">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                  Add Dish
+                </button>
+              </div>
+              <div className="space-y-6">
+                {dishes.map((dish, i) => (
+                  <DishFormSection
+                    key={i}
+                    index={i}
+                    dish={dish}
+                    onChange={handleDishChange}
+                    onRemove={removeDish}
+                    canRemove={dishes.length > 1}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+              <h2 className="text-xl font-semibold text-stone-900 mb-5">Farm Details</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Livestock Types</label>
+                  <input type="text" name="livestock_types" className={inp} placeholder="e.g. Cattle, Poultry, Pigs (comma-separated)" />
+                  <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Produce Types</label>
+                  <input type="text" name="produce_types" className={inp} placeholder="e.g. Vegetables, Herbs, Grains (comma-separated)" />
+                  <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Regenerative / Sustainable Practices</label>
+                  <textarea name="regenerative_practices" rows={3} className={inp} placeholder="e.g. Rotational grazing, Cover cropping, No-till, Composting" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Certifications</label>
+                  <input type="text" name="certifications" className={inp} placeholder="e.g. USDA Organic, Certified Humane, AGA Certified" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Step 4: Review & Attest ───────────────────────────────────────── */}
+        <div className={step === 4 ? '' : 'hidden'}>
+          {/* Summary card */}
+          <div className="bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 rounded-xl p-5 mb-6">
+            <h2 className="text-base font-semibold text-[#2d6a4f] mb-3">Application Summary</h2>
+            <div className="text-sm text-stone-600 space-y-1">
+              <p><span className="font-medium text-stone-800">Type:</span> {applicantType === 'restaurant' ? 'Restaurant' : 'Farm / Producer'}</p>
+              {applicantType === 'restaurant' && (
+                <p><span className="font-medium text-stone-800">Dishes:</span> {dishes.length} submitted</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold text-stone-900 mb-2">Attestation</h2>
+            <p className="text-sm text-stone-500 mb-5">Please read and agree to each statement before submitting.</p>
+            <div className="space-y-4">
+              {[
+                { key: 'accurate' as const, text: 'I attest that all information provided in this application is accurate and truthful to the best of my knowledge.' },
+                { key: 'mainElement' as const, text: applicantType === 'restaurant'
+                  ? 'I understand that certification applies to the main element of each dish only, and does not necessarily extend to all ingredients.'
+                  : 'I understand that MAHA certification is dish-specific and applies to the main element sourced from our farm.' },
+                { key: 'verification' as const, text: 'I understand that MAHA may conduct additional verification of the claims made in this application, including contacting suppliers or farms directly.' },
+                { key: 'revocation' as const, text: 'I understand that certification may be revoked if any claims are found to be inaccurate or if practices change without notification.' },
+              ].map(({ key, text }) => (
+                <label key={key} className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={attestations[key]}
+                    onChange={(e) => setAttestations({ ...attestations, [key]: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 rounded border-stone-300 text-[#2d6a4f] focus:ring-[#2d6a4f]"
+                  />
+                  <span className="text-sm text-stone-700 leading-relaxed group-hover:text-stone-900">{text}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={submitting || !allAttested}
-            className="w-full sm:w-auto bg-[#2d6a4f] text-white px-8 py-3 rounded-xl font-semibold hover:bg-[#1b4332] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#2d6a4f] text-white py-3.5 rounded-xl font-semibold hover:bg-[#1b4332] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
-            {submitting ? 'Submitting...' : 'Submit Application'}
+            {submitting ? 'Submitting…' : 'Submit Application'}
           </button>
         </div>
+
       </form>
+
+      {/* Navigation */}
+      {step < 4 && (
+        <div className={`flex ${step > 0 ? 'justify-between' : 'justify-end'} mt-6`}>
+          {step > 0 && (
+            <button type="button" onClick={handleBack} className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-700 px-4 py-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              Back
+            </button>
+          )}
+          <button type="button" onClick={handleNext} className="flex items-center gap-1.5 bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1b4332] transition-colors">
+            Continue
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

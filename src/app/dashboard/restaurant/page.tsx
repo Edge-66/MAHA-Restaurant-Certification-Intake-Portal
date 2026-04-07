@@ -70,7 +70,7 @@ export default async function RestaurantDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Total Submissions', value: submissions.length },
           { label: 'Pending Review', value: pendingSubmissions.length },
@@ -82,6 +82,39 @@ export default async function RestaurantDashboard() {
             <div className="text-xs text-stone-500">{label}</div>
           </div>
         ))}
+      </div>
+
+      {/* Certification progress bar */}
+      <div className="bg-white border border-stone-200 rounded-xl p-5 mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-sm font-semibold text-stone-900">
+              {restaurant.participation_level === 'certified' ? 'MAHA Certified Restaurant' : 'Certification Progress'}
+            </h2>
+            <p className="text-xs text-stone-500 mt-0.5">
+              {restaurant.participation_level === 'certified'
+                ? 'Your restaurant has achieved full MAHA Certified status.'
+                : `${approvedDishes.length} of 7 dishes certified — ${Math.max(0, 7 - approvedDishes.length)} more needed for MAHA Certified status`}
+            </p>
+          </div>
+          <span className={`text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0 ${
+            restaurant.participation_level === 'certified'
+              ? 'bg-[#2d6a4f] text-white'
+              : 'bg-green-100 text-green-800 border border-green-200'
+          }`}>
+            {restaurant.participation_level === 'certified' ? 'MAHA Certified' : 'Participant'}
+          </span>
+        </div>
+        <div className="w-full bg-stone-100 rounded-full h-2">
+          <div
+            className="bg-[#2d6a4f] h-2 rounded-full transition-all"
+            style={{ width: `${Math.min(100, Math.round((approvedDishes.length / 7) * 100))}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-1.5">
+          <span className="text-xs text-stone-400">{approvedDishes.length} approved</span>
+          <span className="text-xs text-stone-400">7 = MAHA Certified</span>
+        </div>
       </div>
 
       <div className="space-y-6">

@@ -3,6 +3,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
+import {
+  sendApplicationConfirmation,
+  sendSubmissionDecision,
+  sendFarmDecision,
+} from '@/lib/email';
 
 type DishPayload = {
   name: string;
@@ -220,6 +225,10 @@ export async function submitApplication(
     email,
     password,
   });
+
+  // Send confirmation email (non-blocking)
+  const entityName = (formData.get('name') as string) || email;
+  sendApplicationConfirmation(email, entityName, applicantType).catch(() => {});
 
   if (signInError) {
     redirect(`/login?applied=1&email=${encodeURIComponent(email)}`);
@@ -473,4 +482,131 @@ export async function updateDishStatus(dishId: string, status: string) {
     .from('restaurants')
     .update({ participation_level: newLevel })
     .eq('id', dish.restaurant_id);
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+async function createNotification(
+  userId: string,
+  title: string,
+  body: string,
+  link: string
+) {
+  try {
+    const admin = createAdminClient();
+    await admin.from('notifications').insert({ user_id: userId, title, body, link, read: false });
+  } catch {
+    // non-fatal
+  }
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export async function getMyNotifications(): Promise<AppNotification[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from('notifications')
+    .select('id, title, body, link, read, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(15);
+  return (data ?? []) as AppNotification[];
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+}
+
+// ─── Email + notify when admin makes a decision ───────────────────────────────
+
+export async function notifySubmissionDecision(
+  submissionId: string,
+  newStatus: string,
+  adminNotes?: string | null
+): Promise<void> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('submissions')
+    .select('restaurants(id, name, contact_email)')
+    .eq('id', submissionId)
+    .single();
+
+  const restaurant = (data?.restaurants as { id: string; name: string; contact_email: string } | null);
+  if (!restaurant) return;
+
+  // Get user_id linked to this restaurant
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('restaurant_id', restaurant.id)
+    .single();
+
+  // Email
+  if (restaurant.contact_email) {
+    await sendSubmissionDecision(restaurant.contact_email, restaurant.name, newStatus, adminNotes);
+  }
+
+  // In-app notification
+  if (profile?.id) {
+    const titles: Record<string, string> = {
+      approved: `Your submission was approved — ${restaurant.name}`,
+      rejected: `Your submission was not approved — ${restaurant.name}`,
+      needs_clarification: `Action needed on your submission — ${restaurant.name}`,
+    };
+    const bodies: Record<string, string> = {
+      approved: 'Your certified dishes are now live in the public directory.',
+      rejected: 'Your submission did not meet certification requirements at this time.',
+      needs_clarification: adminNotes ?? 'MAHA needs additional information about your submission.',
+    };
+    const title = titles[newStatus] ?? `Submission update — ${restaurant.name}`;
+    const body = bodies[newStatus] ?? '';
+    await createNotification(profile.id, title, body, '/dashboard/restaurant');
+  }
+}
+
+export async function notifyFarmDecision(farmId: string, newStatus: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: farm } = await supabase
+    .from('farms')
+    .select('name, contact_email')
+    .eq('id', farmId)
+    .single();
+
+  if (!farm) return;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('farm_id', farmId)
+    .single();
+
+  // Email
+  if (farm.contact_email) {
+    await sendFarmDecision(farm.contact_email, farm.name, newStatus);
+  }
+
+  // In-app notification
+  if (profile?.id) {
+    const title = newStatus === 'approved'
+      ? `Your farm was approved — ${farm.name}`
+      : `Farm application update — ${farm.name}`;
+    const body = newStatus === 'approved'
+      ? 'Your farm is now listed in the MAHA From the Farm public directory.'
+      : 'Your farm application was not approved at this time.';
+    await createNotification(profile.id, title, body, '/dashboard/farm');
+  }
 }

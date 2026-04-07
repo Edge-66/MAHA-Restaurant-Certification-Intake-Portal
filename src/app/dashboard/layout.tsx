@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Great_Vibes } from 'next/font/google';
 import ProfileDropdown from '@/components/ProfileDropdown';
+import NotificationBell from '@/components/NotificationBell';
 
 const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400' });
 
@@ -17,13 +18,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               From the Farm
             </span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href="/directory"
-              className="text-sm text-stone-500 hover:text-stone-700 transition-colors"
+              className="text-sm text-stone-500 hover:text-stone-700 transition-colors hidden sm:block"
             >
               Public Directory
             </Link>
+            <NotificationBell />
             <ProfileDropdown accountHref="/dashboard/account" variant="light" dropDirection="down" />
           </div>
         </div>

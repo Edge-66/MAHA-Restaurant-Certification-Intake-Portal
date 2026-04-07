@@ -7,6 +7,7 @@ import StatusBadge from '@/components/StatusBadge';
 import DishCard from '@/components/DishCard';
 import type { SubmissionWithDetails } from '@/lib/types';
 import { geocodeAddress } from '@/lib/geocode';
+import { notifySubmissionDecision } from '@/lib/actions';
 
 function getSupabase() {
   return createBrowserClient(
@@ -112,6 +113,12 @@ export default function SubmissionDetailPage() {
     }
 
     await fetchSubmission();
+
+    // Email + in-app notification when status changes
+    if (selectedStatus !== submission?.status) {
+      notifySubmissionDecision(id, selectedStatus, adminNotes).catch(() => {});
+    }
+
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -271,12 +278,27 @@ export default function SubmissionDetailPage() {
                     Regenerative Alliance of America — additional verification required
                   </div>
                 );
-                if (cert === 'usda_organic') return (
-                  <div className="mt-2 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-800 font-medium">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    USDA Organic Certified
-                  </div>
-                );
+                if (cert === 'usda_organic') {
+                  const supplierName = dish.supplier_name;
+                  return (
+                    <div className="mt-2 flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 text-xs text-emerald-800 font-medium">
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        USDA Organic Certified
+                      </div>
+                      <a
+                        href={`https://organic.ams.usda.gov/integrity/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Search for "${supplierName}" on USDA Organic Integrity Database`}
+                        className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900 font-medium underline underline-offset-2 flex-shrink-0"
+                      >
+                        Verify on USDA
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                      </a>
+                    </div>
+                  );
+                }
                 return null;
               })()}
               {/* Cert document link */}

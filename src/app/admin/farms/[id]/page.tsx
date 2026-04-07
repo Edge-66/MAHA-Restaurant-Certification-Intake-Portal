@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
 import type { Farm } from '@/lib/types';
 import { geocodeAddress } from '@/lib/geocode';
+import { notifyFarmDecision } from '@/lib/actions';
 
 function parsePhotoUrls(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -126,7 +127,14 @@ export default function AdminFarmDetailPage() {
 
     updateData.reviewed_by = adminEmail || null;
     await supabase.from('farms').update(updateData).eq('id', id);
+    const prevStatus = farm?.status;
     await fetchFarm();
+
+    // Email + in-app notification when status changes
+    if (selectedStatus !== prevStatus && (selectedStatus === 'approved' || selectedStatus === 'rejected')) {
+      notifyFarmDecision(id, selectedStatus).catch(() => {});
+    }
+
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
