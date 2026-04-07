@@ -2,22 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import {
-  getAdminUsers,
-  updateAdminTier,
-  deleteAdminAccount,
-  getRestaurantUsers,
-  getFarmUsers,
-  deleteRestaurantAccount,
-  deleteFarm,
-  type RestaurantUser,
-  type FarmUser,
-} from '@/lib/actions';
+import { getAdminUsers, updateAdminTier, deleteAdminAccount } from '@/lib/actions';
 
 const TIER_LABELS: Record<number, string> = {
   1: 'Editor',
   2: 'Reviewer',
   3: 'Super Admin',
+};
+
+const TIER_DESCRIPTIONS: Record<number, string> = {
+  1: 'View submissions and farms, edit contact info and descriptions',
+  2: 'Everything in Tier 1 plus approve/reject submissions and farms',
+  3: 'Full access including account management and deletions',
 };
 
 interface AdminUser {
@@ -33,27 +29,12 @@ export default function PermissionsPage() {
   const [myTier, setMyTier] = useState(1);
   const [masterEmail] = useState(process.env.NEXT_PUBLIC_MASTER_ADMIN_EMAIL ?? '');
 
-  // Admins
   const [admins, setAdmins] = useState<AdminUser[]>([]);
-  const [adminsLoading, setAdminsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [tierUpdating, setTierUpdating] = useState<string | null>(null);
-  const [adminDeleting, setAdminDeleting] = useState<string | null>(null);
-  const [adminConfirmDelete, setAdminConfirmDelete] = useState<string | null>(null);
-  const [adminMsg, setAdminMsg] = useState<FeedbackMsg | null>(null);
-
-  // Restaurants
-  const [restaurants, setRestaurants] = useState<RestaurantUser[]>([]);
-  const [restaurantsLoading, setRestaurantsLoading] = useState(true);
-  const [restaurantDeleting, setRestaurantDeleting] = useState<string | null>(null);
-  const [restaurantConfirmDelete, setRestaurantConfirmDelete] = useState<string | null>(null);
-  const [restaurantMsg, setRestaurantMsg] = useState<FeedbackMsg | null>(null);
-
-  // Farms
-  const [farms, setFarms] = useState<FarmUser[]>([]);
-  const [farmsLoading, setFarmsLoading] = useState(true);
-  const [farmDeleting, setFarmDeleting] = useState<string | null>(null);
-  const [farmConfirmDelete, setFarmConfirmDelete] = useState<string | null>(null);
-  const [farmMsg, setFarmMsg] = useState<FeedbackMsg | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [msg, setMsg] = useState<FeedbackMsg | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -64,75 +45,38 @@ export default function PermissionsPage() {
         .from('profiles').select('admin_tier').eq('id', data.user.id).single();
       setMyTier(profile?.admin_tier ?? 1);
     });
-
-    getAdminUsers().then((list) => { setAdmins(list); setAdminsLoading(false); });
-    getRestaurantUsers().then((list) => { setRestaurants(list); setRestaurantsLoading(false); });
-    getFarmUsers().then((list) => { setFarms(list); setFarmsLoading(false); });
+    getAdminUsers().then((list) => { setAdmins(list); setLoading(false); });
   }, []);
 
   function isMaster(email: string) {
     return !!masterEmail && email.toLowerCase() === masterEmail.toLowerCase();
   }
 
-  // ── Admin tier change ──────────────────────────────────────────────────────
   async function handleTierChange(targetId: string, newTier: number) {
     setTierUpdating(targetId);
-    setAdminMsg(null);
+    setMsg(null);
     const result = await updateAdminTier(targetId, newTier);
     if (result.error) {
-      setAdminMsg({ type: 'error', text: result.error });
+      setMsg({ type: 'error', text: result.error });
     } else {
       setAdmins((prev) => prev.map((a) => a.id === targetId ? { ...a, tier: newTier } : a));
-      setAdminMsg({ type: 'success', text: 'Permission tier updated.' });
+      setMsg({ type: 'success', text: 'Permission tier updated.' });
     }
     setTierUpdating(null);
   }
 
-  // ── Admin delete ───────────────────────────────────────────────────────────
-  async function handleAdminDelete(targetId: string) {
-    setAdminDeleting(targetId);
-    setAdminMsg(null);
+  async function handleDelete(targetId: string) {
+    setDeleting(targetId);
+    setMsg(null);
     const result = await deleteAdminAccount(targetId);
     if (result.error) {
-      setAdminMsg({ type: 'error', text: result.error });
+      setMsg({ type: 'error', text: result.error });
     } else {
       setAdmins((prev) => prev.filter((a) => a.id !== targetId));
-      setAdminMsg({ type: 'success', text: 'Admin account removed.' });
+      setMsg({ type: 'success', text: 'Admin account removed.' });
     }
-    setAdminDeleting(null);
-    setAdminConfirmDelete(null);
-  }
-
-  // ── Restaurant delete ──────────────────────────────────────────────────────
-  async function handleRestaurantDelete(restaurantId: string) {
-    setRestaurantDeleting(restaurantId);
-    setRestaurantMsg(null);
-    const result = await deleteRestaurantAccount(restaurantId);
-    if (result.error) {
-      setRestaurantMsg({ type: 'error', text: result.error });
-      setRestaurantDeleting(null);
-    } else {
-      setRestaurants((prev) => prev.filter((r) => r.id !== restaurantId));
-      setRestaurantMsg({ type: 'success', text: 'Restaurant account removed.' });
-      setRestaurantDeleting(null);
-    }
-    setRestaurantConfirmDelete(null);
-  }
-
-  // ── Farm delete ────────────────────────────────────────────────────────────
-  async function handleFarmDelete(farmId: string) {
-    setFarmDeleting(farmId);
-    setFarmMsg(null);
-    const result = await deleteFarm(farmId);
-    if (result.error) {
-      setFarmMsg({ type: 'error', text: result.error });
-      setFarmDeleting(null);
-    } else {
-      setFarms((prev) => prev.filter((f) => f.id !== farmId));
-      setFarmMsg({ type: 'success', text: 'Farm account removed.' });
-      setFarmDeleting(null);
-    }
-    setFarmConfirmDelete(null);
+    setDeleting(null);
+    setConfirmDelete(null);
   }
 
   if (myTier < 3) {
@@ -145,34 +89,53 @@ export default function PermissionsPage() {
     );
   }
 
-  const msgBox = (msg: FeedbackMsg | null) => msg ? (
-    <div className={`mb-5 px-4 py-3 rounded-lg text-sm ${
-      msg.type === 'success'
-        ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-        : 'bg-red-50 border border-red-200 text-red-700'
-    }`}>
-      {msg.text}
-    </div>
-  ) : null;
-
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-2xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-stone-900 mb-1">Permissions</h1>
-        <p className="text-sm text-stone-500">Manage access levels and remove accounts. The master admin account is protected.</p>
+        <p className="text-sm text-stone-500">Manage access levels for admin accounts.</p>
       </div>
 
-      {/* ── Admin Accounts ─────────────────────────────────────────────────── */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+      {/* Tier reference */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+        {([1, 2, 3] as const).map((tier) => (
+          <div key={tier} className="bg-white border border-stone-200 rounded-xl p-4">
+            <div className={`inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full mb-2 ${
+              tier === 3 ? 'bg-purple-100 text-purple-700'
+              : tier === 2 ? 'bg-blue-100 text-blue-700'
+              : 'bg-stone-100 text-stone-700'
+            }`}>
+              Tier {tier} — {TIER_LABELS[tier]}
+            </div>
+            <p className="text-xs text-stone-500 leading-relaxed">{TIER_DESCRIPTIONS[tier]}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Admin list */}
+      <div className="bg-white border border-stone-200 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-stone-900 mb-1">Admin Accounts</h2>
-        <p className="text-sm text-stone-500 mb-5">Change permission tiers or remove admin accounts.</p>
-        {msgBox(adminMsg)}
-        {adminsLoading ? (
+        <p className="text-sm text-stone-500 mb-5">
+          Change permission tiers or remove admin accounts. To reset passwords or update emails, use the{' '}
+          <a href="/admin/accounts" className="text-[#2d6a4f] hover:underline font-medium">Accounts</a> page.
+        </p>
+
+        {msg && (
+          <div className={`mb-5 px-4 py-3 rounded-lg text-sm ${
+            msg.type === 'success'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : 'bg-red-50 border border-red-200 text-red-700'
+          }`}>
+            {msg.text}
+          </div>
+        )}
+
+        {loading ? (
           <div className="text-sm text-stone-400">Loading…</div>
         ) : (
           <ul className="divide-y divide-stone-100">
             {admins.map((admin) => {
-              const locked = isMaster(admin.email) || admin.id === myId;
+              const locked = isMaster(admin.email);
               const isSelf = admin.id === myId;
               return (
                 <li key={admin.id} className="py-4">
@@ -181,9 +144,7 @@ export default function PermissionsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium text-stone-900 truncate">{admin.email}</p>
                         {isSelf && <span className="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">You</span>}
-                        {isMaster(admin.email) && (
-                          <span className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">Master Account</span>
-                        )}
+                        {locked && <span className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">Master</span>}
                       </div>
                       <p className="text-xs text-stone-400 mt-0.5">Tier {admin.tier} — {TIER_LABELS[admin.tier]}</p>
                     </div>
@@ -198,24 +159,24 @@ export default function PermissionsPage() {
                         <option value={2}>Tier 2 — Reviewer</option>
                         <option value={3}>Tier 3 — Super Admin</option>
                       </select>
-                      {!locked && (
-                        adminConfirmDelete === admin.id ? (
+                      {!locked && !isSelf && (
+                        confirmDelete === admin.id ? (
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-stone-500">Remove?</span>
                             <button
-                              onClick={() => handleAdminDelete(admin.id)}
-                              disabled={adminDeleting === admin.id}
+                              onClick={() => handleDelete(admin.id)}
+                              disabled={deleting === admin.id}
                               className="text-xs px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                             >
-                              {adminDeleting === admin.id ? '…' : 'Yes'}
+                              {deleting === admin.id ? '…' : 'Yes'}
                             </button>
-                            <button onClick={() => setAdminConfirmDelete(null)} className="text-xs px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
+                            <button onClick={() => setConfirmDelete(null)} className="text-xs px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
                               Cancel
                             </button>
                           </div>
                         ) : (
                           <button
-                            onClick={() => setAdminConfirmDelete(admin.id)}
+                            onClick={() => setConfirmDelete(admin.id)}
                             className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
                           >
                             Remove
@@ -230,100 +191,6 @@ export default function PermissionsPage() {
                 </li>
               );
             })}
-          </ul>
-        )}
-      </div>
-
-      {/* ── Restaurant Accounts ────────────────────────────────────────────── */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-stone-900 mb-1">Restaurant Accounts</h2>
-        <p className="text-sm text-stone-500 mb-5">Remove restaurant accounts and all associated submissions and dishes.</p>
-        {msgBox(restaurantMsg)}
-        {restaurantsLoading ? (
-          <div className="text-sm text-stone-400">Loading…</div>
-        ) : restaurants.length === 0 ? (
-          <div className="text-sm text-stone-400">No restaurant accounts found.</div>
-        ) : (
-          <ul className="divide-y divide-stone-100">
-            {restaurants.map((r) => (
-              <li key={r.id} className="py-4 flex items-center justify-between gap-4 flex-wrap">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-stone-900 truncate">{r.name}</p>
-                  <p className="text-xs text-stone-400 mt-0.5">{r.email} · {r.city}, {r.state}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {restaurantConfirmDelete === r.id ? (
-                    <>
-                      <span className="text-xs text-stone-500">Remove?</span>
-                      <button
-                        onClick={() => handleRestaurantDelete(r.id)}
-                        disabled={restaurantDeleting === r.id}
-                        className="text-xs px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                      >
-                        {restaurantDeleting === r.id ? '…' : 'Yes'}
-                      </button>
-                      <button onClick={() => setRestaurantConfirmDelete(null)} className="text-xs px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setRestaurantConfirmDelete(r.id)}
-                      className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* ── Farm Accounts ──────────────────────────────────────────────────── */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-stone-900 mb-1">Farm Accounts</h2>
-        <p className="text-sm text-stone-500 mb-5">Remove farm accounts and all associated data.</p>
-        {msgBox(farmMsg)}
-        {farmsLoading ? (
-          <div className="text-sm text-stone-400">Loading…</div>
-        ) : farms.length === 0 ? (
-          <div className="text-sm text-stone-400">No farm accounts found.</div>
-        ) : (
-          <ul className="divide-y divide-stone-100">
-            {farms.map((f) => (
-              <li key={f.id} className="py-4 flex items-center justify-between gap-4 flex-wrap">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-stone-900 truncate">{f.name}</p>
-                  <p className="text-xs text-stone-400 mt-0.5">{f.email} · {f.city}, {f.state}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {farmConfirmDelete === f.id ? (
-                    <>
-                      <span className="text-xs text-stone-500">Remove?</span>
-                      <button
-                        onClick={() => handleFarmDelete(f.id)}
-                        disabled={farmDeleting === f.id}
-                        className="text-xs px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                      >
-                        {farmDeleting === f.id ? '…' : 'Yes'}
-                      </button>
-                      <button onClick={() => setFarmConfirmDelete(null)} className="text-xs px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setFarmConfirmDelete(f.id)}
-                      className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
           </ul>
         )}
       </div>

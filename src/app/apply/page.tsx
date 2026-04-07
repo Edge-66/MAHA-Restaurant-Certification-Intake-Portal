@@ -308,7 +308,7 @@ export default function ApplyPage() {
                   rows={3}
                   className={inp}
                   placeholder={applicantType === 'restaurant'
-                    ? 'Tell us about your restaurant and your commitment to local sourcing…'
+                    ? 'Tell us about your restaurant…'
                     : 'Tell us about your farm and farming philosophy…'}
                 />
               </div>

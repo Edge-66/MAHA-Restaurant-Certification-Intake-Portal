@@ -10,13 +10,14 @@ import {
   sendPasswordResetForRestaurant,
   sendPasswordResetForFarm,
   updateUserEmail,
+  deleteRestaurantAccount,
+  deleteFarm,
   type RestaurantUser,
   type FarmUser,
 } from '@/lib/actions';
 
 interface AdminUser { id: string; email: string; tier: number }
 type FeedbackMsg = { type: 'success' | 'error'; text: string };
-
 type Tab = 'admins' | 'restaurants' | 'farms';
 
 const TIER_LABELS: Record<number, string> = { 1: 'Editor', 2: 'Reviewer', 3: 'Super Admin' };
@@ -37,13 +38,14 @@ export default function AccountsPage() {
   const [farms, setFarms] = useState<FarmUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Per-row state: which user has the email editor open
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState('');
   const [emailSaving, setEmailSaving] = useState(false);
 
-  // Per-row state: password reset in progress
   const [sendingReset, setSendingReset] = useState<string | null>(null);
+
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const [msg, setMsg] = useState<FeedbackMsg | null>(null);
 
@@ -56,7 +58,6 @@ export default function AccountsPage() {
         .from('profiles').select('admin_tier').eq('id', data.user.id).single();
       setMyTier(profile?.admin_tier ?? 1);
     });
-
     Promise.all([getAdminUsers(), getRestaurantUsers(), getFarmUsers()]).then(
       ([a, r, f]) => { setAdmins(a); setRestaurants(r); setFarms(f); setLoading(false); }
     );
@@ -76,22 +77,26 @@ export default function AccountsPage() {
     setSendingReset(key);
     setMsg(null);
     const result = await action();
-    if (result.error) {
-      showMsg({ type: 'error', text: result.error });
-    } else {
-      showMsg({ type: 'success', text: 'Password reset email sent.' });
-    }
+    showMsg(result.error
+      ? { type: 'error', text: result.error }
+      : { type: 'success', text: 'Password reset email sent.' }
+    );
     setSendingReset(null);
   }
 
   // ── Email change ───────────────────────────────────────────────────────────
-  function startEmailEdit(userId: string, currentEmail: string) {
-    setEditingEmail(userId);
+  function startEmailEdit(key: string, currentEmail: string) {
+    setEditingEmail(key);
     setEmailDraft(currentEmail);
     setMsg(null);
   }
 
-  async function saveEmailChange(userId: string, userType: 'admin' | 'restaurant' | 'farm', entityId: string) {
+  async function saveEmailChange(
+    userId: string,
+    userType: 'admin' | 'restaurant' | 'farm',
+    entityId: string,
+    editKey: string
+  ) {
     if (!emailDraft.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDraft)) {
       showMsg({ type: 'error', text: 'Please enter a valid email address.' });
       return;
@@ -101,18 +106,30 @@ export default function AccountsPage() {
     if (result.error) {
       showMsg({ type: 'error', text: result.error });
     } else {
-      // Update local state
-      if (userType === 'admin') {
-        setAdmins((prev) => prev.map((a) => a.id === userId ? { ...a, email: emailDraft.trim() } : a));
-      } else if (userType === 'restaurant') {
-        setRestaurants((prev) => prev.map((r) => r.id === entityId ? { ...r, email: emailDraft.trim() } : r));
-      } else {
-        setFarms((prev) => prev.map((f) => f.id === entityId ? { ...f, email: emailDraft.trim() } : f));
-      }
+      const trimmed = emailDraft.trim();
+      if (userType === 'admin') setAdmins((prev) => prev.map((a) => a.id === userId ? { ...a, email: trimmed } : a));
+      else if (userType === 'restaurant') setRestaurants((prev) => prev.map((r) => r.id === entityId ? { ...r, email: trimmed } : r));
+      else setFarms((prev) => prev.map((f) => f.id === entityId ? { ...f, email: trimmed } : f));
       showMsg({ type: 'success', text: 'Email updated.' });
       setEditingEmail(null);
     }
     setEmailSaving(false);
+    void editKey;
+  }
+
+  // ── Delete ─────────────────────────────────────────────────────────────────
+  async function handleDelete(key: string, action: () => Promise<{ error?: string }>, onSuccess: () => void) {
+    setDeleting(key);
+    setMsg(null);
+    const result = await action();
+    if (result.error) {
+      showMsg({ type: 'error', text: result.error });
+    } else {
+      onSuccess();
+      showMsg({ type: 'success', text: 'Account removed.' });
+    }
+    setDeleting(null);
+    setConfirmDelete(null);
   }
 
   if (myTier < 3) {
@@ -127,33 +144,43 @@ export default function AccountsPage() {
 
   const inp = 'border border-stone-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent outline-none';
 
-  const ResetBtn = ({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-50 whitespace-nowrap"
-    >
-      {disabled ? 'Sending…' : label}
-    </button>
-  );
-
-  const EditEmailBtn = ({ onClick }: { onClick: () => void }) => (
-    <button
-      onClick={onClick}
-      className="text-xs px-3 py-1.5 border border-[#2d6a4f]/30 rounded-lg text-[#2d6a4f] hover:bg-[#2d6a4f]/5 transition-colors whitespace-nowrap"
-    >
-      Change Email
-    </button>
-  );
+  const DeleteBtn = ({ id }: { id: string }) =>
+    confirmDelete === id ? (
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-stone-500">Remove?</span>
+        <button
+          onClick={() => {
+            if (tab === 'restaurants') {
+              handleDelete(id, () => deleteRestaurantAccount(id), () => setRestaurants((p) => p.filter((r) => r.id !== id)));
+            } else {
+              handleDelete(id, () => deleteFarm(id), () => setFarms((p) => p.filter((f) => f.id !== id)));
+            }
+          }}
+          disabled={deleting === id}
+          className="text-xs px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+        >
+          {deleting === id ? '…' : 'Yes'}
+        </button>
+        <button onClick={() => setConfirmDelete(null)} className="text-xs px-2.5 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
+          Cancel
+        </button>
+      </div>
+    ) : (
+      <button
+        onClick={() => setConfirmDelete(id)}
+        className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
+      >
+        Remove
+      </button>
+    );
 
   return (
     <div className="max-w-3xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-stone-900 mb-1">Accounts</h1>
-        <p className="text-sm text-stone-500">Manage user credentials — reset passwords and update email addresses.</p>
+        <p className="text-sm text-stone-500">Reset passwords, update emails, and remove accounts for all users.</p>
       </div>
 
-      {/* Feedback */}
       {msg && (
         <div className={`mb-6 px-4 py-3 rounded-lg text-sm ${
           msg.type === 'success'
@@ -169,7 +196,7 @@ export default function AccountsPage() {
         {(['admins', 'restaurants', 'farms'] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => { setTab(t); setConfirmDelete(null); setEditingEmail(null); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
               tab === t ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'
             }`}
@@ -186,11 +213,12 @@ export default function AccountsPage() {
         <div className="bg-white border border-stone-200 rounded-xl p-8 text-center text-stone-400 text-sm">Loading…</div>
       ) : (
         <>
-          {/* ── Admins Tab ──────────────────────────────────────────────────── */}
+          {/* ── Admins ─────────────────────────────────────────────────────── */}
           {tab === 'admins' && (
             <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-stone-100">
                 <h2 className="font-semibold text-stone-900">Admin Accounts</h2>
+                <p className="text-xs text-stone-400 mt-0.5">To change permission tiers, use the <a href="/admin/permissions" className="text-[#2d6a4f] hover:underline">Permissions</a> page.</p>
               </div>
               <ul className="divide-y divide-stone-100">
                 {admins.map((admin) => {
@@ -213,35 +241,31 @@ export default function AccountsPage() {
                         </div>
                         {!locked && (
                           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                            <ResetBtn
-                              label="Send Password Reset"
-                              disabled={sendingReset === admin.id}
+                            <button
                               onClick={() => handlePasswordReset(admin.id, () => sendPasswordReset(admin.id))}
-                            />
-                            {!isSelf && <EditEmailBtn onClick={() => startEmailEdit(editKey, admin.email)} />}
+                              disabled={sendingReset === admin.id}
+                              className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {sendingReset === admin.id ? 'Sending…' : 'Send Password Reset'}
+                            </button>
+                            {!isSelf && (
+                              <button
+                                onClick={() => startEmailEdit(editKey, admin.email)}
+                                className="text-xs px-3 py-1.5 border border-[#2d6a4f]/30 rounded-lg text-[#2d6a4f] hover:bg-[#2d6a4f]/5 transition-colors whitespace-nowrap"
+                              >
+                                Change Email
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
                       {isEditing && (
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <input
-                            type="email"
-                            value={emailDraft}
-                            onChange={(e) => setEmailDraft(e.target.value)}
-                            className={inp + ' flex-1 min-w-48'}
-                            placeholder="New email address"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => saveEmailChange(admin.id, 'admin', admin.id)}
-                            disabled={emailSaving}
-                            className="text-xs px-3 py-1.5 bg-[#2d6a4f] text-white rounded-lg hover:bg-[#1b4332] disabled:opacity-50"
-                          >
+                          <input type="email" value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} className={inp + ' flex-1 min-w-48'} placeholder="New email address" autoFocus />
+                          <button onClick={() => saveEmailChange(admin.id, 'admin', admin.id, editKey)} disabled={emailSaving} className="text-xs px-3 py-1.5 bg-[#2d6a4f] text-white rounded-lg hover:bg-[#1b4332] disabled:opacity-50">
                             {emailSaving ? 'Saving…' : 'Save'}
                           </button>
-                          <button onClick={() => setEditingEmail(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
-                            Cancel
-                          </button>
+                          <button onClick={() => setEditingEmail(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">Cancel</button>
                         </div>
                       )}
                     </li>
@@ -251,7 +275,7 @@ export default function AccountsPage() {
             </div>
           )}
 
-          {/* ── Restaurants Tab ─────────────────────────────────────────────── */}
+          {/* ── Restaurants ─────────────────────────────────────────────────── */}
           {tab === 'restaurants' && (
             <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-stone-100">
@@ -272,36 +296,31 @@ export default function AccountsPage() {
                             <p className="text-xs text-stone-400 mt-0.5">{r.email} · {r.contactName} · {r.city}, {r.state}</p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                            {r.profileId ? (
-                              <ResetBtn
-                                label="Send Password Reset"
-                                disabled={sendingReset === r.id}
+                            {r.profileId && (
+                              <button
                                 onClick={() => handlePasswordReset(r.id, () => sendPasswordResetForRestaurant(r.id))}
-                              />
-                            ) : null}
-                            <EditEmailBtn onClick={() => startEmailEdit(editKey, r.email)} />
+                                disabled={sendingReset === r.id}
+                                className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                              >
+                                {sendingReset === r.id ? 'Sending…' : 'Send Password Reset'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => startEmailEdit(editKey, r.email)}
+                              className="text-xs px-3 py-1.5 border border-[#2d6a4f]/30 rounded-lg text-[#2d6a4f] hover:bg-[#2d6a4f]/5 transition-colors whitespace-nowrap"
+                            >
+                              Change Email
+                            </button>
+                            <DeleteBtn id={r.id} />
                           </div>
                         </div>
                         {isEditing && r.profileId && (
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <input
-                              type="email"
-                              value={emailDraft}
-                              onChange={(e) => setEmailDraft(e.target.value)}
-                              className={inp + ' flex-1 min-w-48'}
-                              placeholder="New email address"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => saveEmailChange(r.profileId!, 'restaurant', r.id)}
-                              disabled={emailSaving}
-                              className="text-xs px-3 py-1.5 bg-[#2d6a4f] text-white rounded-lg hover:bg-[#1b4332] disabled:opacity-50"
-                            >
+                            <input type="email" value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} className={inp + ' flex-1 min-w-48'} placeholder="New email address" autoFocus />
+                            <button onClick={() => saveEmailChange(r.profileId!, 'restaurant', r.id, editKey)} disabled={emailSaving} className="text-xs px-3 py-1.5 bg-[#2d6a4f] text-white rounded-lg hover:bg-[#1b4332] disabled:opacity-50">
                               {emailSaving ? 'Saving…' : 'Save'}
                             </button>
-                            <button onClick={() => setEditingEmail(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
-                              Cancel
-                            </button>
+                            <button onClick={() => setEditingEmail(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">Cancel</button>
                           </div>
                         )}
                       </li>
@@ -312,7 +331,7 @@ export default function AccountsPage() {
             </div>
           )}
 
-          {/* ── Farms Tab ───────────────────────────────────────────────────── */}
+          {/* ── Farms ───────────────────────────────────────────────────────── */}
           {tab === 'farms' && (
             <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-stone-100">
@@ -333,36 +352,31 @@ export default function AccountsPage() {
                             <p className="text-xs text-stone-400 mt-0.5">{f.email} · {f.contactName} · {f.city}, {f.state}</p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                            {f.profileId ? (
-                              <ResetBtn
-                                label="Send Password Reset"
-                                disabled={sendingReset === f.id}
+                            {f.profileId && (
+                              <button
                                 onClick={() => handlePasswordReset(f.id, () => sendPasswordResetForFarm(f.id))}
-                              />
-                            ) : null}
-                            <EditEmailBtn onClick={() => startEmailEdit(editKey, f.email)} />
+                                disabled={sendingReset === f.id}
+                                className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                              >
+                                {sendingReset === f.id ? 'Sending…' : 'Send Password Reset'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => startEmailEdit(editKey, f.email)}
+                              className="text-xs px-3 py-1.5 border border-[#2d6a4f]/30 rounded-lg text-[#2d6a4f] hover:bg-[#2d6a4f]/5 transition-colors whitespace-nowrap"
+                            >
+                              Change Email
+                            </button>
+                            <DeleteBtn id={f.id} />
                           </div>
                         </div>
                         {isEditing && f.profileId && (
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <input
-                              type="email"
-                              value={emailDraft}
-                              onChange={(e) => setEmailDraft(e.target.value)}
-                              className={inp + ' flex-1 min-w-48'}
-                              placeholder="New email address"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => saveEmailChange(f.profileId!, 'farm', f.id)}
-                              disabled={emailSaving}
-                              className="text-xs px-3 py-1.5 bg-[#2d6a4f] text-white rounded-lg hover:bg-[#1b4332] disabled:opacity-50"
-                            >
+                            <input type="email" value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} className={inp + ' flex-1 min-w-48'} placeholder="New email address" autoFocus />
+                            <button onClick={() => saveEmailChange(f.profileId!, 'farm', f.id, editKey)} disabled={emailSaving} className="text-xs px-3 py-1.5 bg-[#2d6a4f] text-white rounded-lg hover:bg-[#1b4332] disabled:opacity-50">
                               {emailSaving ? 'Saving…' : 'Save'}
                             </button>
-                            <button onClick={() => setEditingEmail(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">
-                              Cancel
-                            </button>
+                            <button onClick={() => setEditingEmail(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">Cancel</button>
                           </div>
                         )}
                       </li>
