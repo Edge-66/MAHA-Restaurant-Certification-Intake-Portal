@@ -14,6 +14,8 @@ type DishPayload = {
   supplier_state: string | null;
   supplier_website: string | null;
   supplier_certifications: string | null;
+  main_element_cert_type: string | null;
+  main_element_cert_other: string | null;
   meets_non_negotiables: boolean;
   notes: string | null;
 };
@@ -184,6 +186,8 @@ export async function submitApplication(
           supplier_state: dish.supplier_state || null,
           supplier_website: dish.supplier_website || null,
           supplier_certifications: dish.supplier_certifications || null,
+          main_element_cert_type: dish.main_element_cert_type || null,
+          main_element_cert_other: dish.main_element_cert_other || null,
           meets_non_negotiables: dish.meets_non_negotiables,
           notes: dish.notes || null,
         });

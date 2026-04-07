@@ -41,6 +41,8 @@ export interface Dish {
   supplier_state: string | null;
   supplier_website: string | null;
   supplier_certifications: string | null;
+  main_element_cert_type: 'usda_organic' | 'aga' | 'raa' | 'other' | 'none' | null;
+  main_element_cert_other: string | null;
   meets_non_negotiables: boolean;
   notes: string | null;
   status: 'pending' | 'approved' | 'rejected';
@@ -110,6 +112,8 @@ export interface DishFormData {
   supplier_state: string;
   supplier_website: string;
   supplier_certifications: string;
+  main_element_cert_type: 'usda_organic' | 'aga' | 'raa' | 'other' | 'none' | '';
+  main_element_cert_other: string;
   meets_non_negotiables: boolean;
   notes: string;
 }
