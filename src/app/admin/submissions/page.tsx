@@ -5,25 +5,32 @@ import StatusBadge from '@/components/StatusBadge';
 export default async function SubmissionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ tab?: string; status?: string }>;
 }) {
   const params = await searchParams;
+  const activeTab = params.tab === 'farms' ? 'farms' : 'restaurants';
   const filterStatus = params.status || 'all';
   const supabase = await createClient();
 
-  let query = supabase
+  // ── Restaurant submissions ────────────────────────────────────────────────
+  let subQuery = supabase
     .from('submissions')
     .select('*, restaurants(*), dishes(id)')
     .order('submitted_at', { ascending: false });
-
-  if (filterStatus !== 'all') {
-    query = query.eq('status', filterStatus);
-  }
-
-  const { data: submissions } = await query;
+  if (filterStatus !== 'all') subQuery = subQuery.eq('status', filterStatus);
+  const { data: submissions } = await subQuery;
   const allSubmissions = submissions || [];
 
-  const statuses = [
+  // ── Farm applications ─────────────────────────────────────────────────────
+  let farmQuery = supabase
+    .from('farms')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (filterStatus !== 'all') farmQuery = farmQuery.eq('status', filterStatus);
+  const { data: farms } = await farmQuery;
+  const allFarms = farms || [];
+
+  const restaurantStatuses = [
     { key: 'all', label: 'All' },
     { key: 'pending', label: 'Pending' },
     { key: 'needs_clarification', label: 'Needs Clarification' },
@@ -31,16 +38,56 @@ export default async function SubmissionsPage({
     { key: 'rejected', label: 'Rejected' },
   ];
 
+  const farmStatuses = [
+    { key: 'all', label: 'All' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'approved', label: 'Approved' },
+    { key: 'rejected', label: 'Rejected' },
+  ];
+
+  const statusOptions = activeTab === 'farms' ? farmStatuses : restaurantStatuses;
+
+  function tabHref(tab: string) {
+    return `/admin/submissions?tab=${tab}`;
+  }
+  function statusHref(s: string) {
+    const base = `/admin/submissions?tab=${activeTab}`;
+    return s === 'all' ? base : `${base}&status=${s}`;
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-stone-900 mb-8">Submissions</h1>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-stone-900 mb-1">Submissions</h1>
+        <p className="text-sm text-stone-500">Review and manage restaurant dish submissions and farm applications.</p>
+      </div>
 
-      {/* Filter Tabs */}
+      {/* Tab selector */}
+      <div className="flex gap-1 p-1 bg-stone-100 rounded-xl w-fit mb-6">
+        {[
+          { key: 'restaurants', label: 'Restaurants' },
+          { key: 'farms', label: 'Farms' },
+        ].map(({ key, label }) => (
+          <Link
+            key={key}
+            href={tabHref(key)}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === key
+                ? 'bg-white text-stone-900 shadow-sm'
+                : 'text-stone-500 hover:text-stone-700'
+            }`}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
+
+      {/* Status filters */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {statuses.map((s) => (
+        {statusOptions.map((s) => (
           <Link
             key={s.key}
-            href={s.key === 'all' ? '/admin/submissions' : `/admin/submissions?status=${s.key}`}
+            href={statusHref(s.key)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filterStatus === s.key
                 ? 'bg-[#2d6a4f] text-white'
@@ -52,56 +99,123 @@ export default async function SubmissionsPage({
         ))}
       </div>
 
-      {/* Submissions Table */}
-      <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
-        {allSubmissions.length === 0 ? (
-          <div className="p-8 text-center text-stone-500 text-sm">
-            No submissions found.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-stone-50 border-b border-stone-200">
-                <th className="text-left px-6 py-3 font-medium text-stone-600">Restaurant</th>
-                <th className="text-left px-6 py-3 font-medium text-stone-600">Submitted</th>
-                <th className="text-left px-6 py-3 font-medium text-stone-600">Dishes</th>
-                <th className="text-left px-6 py-3 font-medium text-stone-600">Status</th>
-                <th className="px-6 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {allSubmissions.map((submission) => (
-                <tr key={submission.id} className="hover:bg-stone-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-stone-900">
-                    {submission.restaurants?.name || 'Unknown'}
-                  </td>
-                  <td className="px-6 py-4 text-stone-500">
-                    {new Date(submission.submitted_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </td>
-                  <td className="px-6 py-4 text-stone-500">
-                    {(submission.dishes || []).length}
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={submission.status} />
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Link
-                      href={`/admin/submissions/${submission.id}`}
-                      className="text-[#2d6a4f] hover:underline font-medium"
-                    >
-                      Review →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* ── Restaurants tab ─────────────────────────────────────────────────── */}
+      {activeTab === 'restaurants' && (
+        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+          {allSubmissions.length === 0 ? (
+            <div className="p-8 text-center text-stone-500 text-sm">No submissions found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[500px]">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-stone-200">
+                    <th className="text-left px-6 py-3 font-medium text-stone-600">Restaurant</th>
+                    <th className="text-left px-6 py-3 font-medium text-stone-600 hidden sm:table-cell">Submitted</th>
+                    <th className="text-left px-6 py-3 font-medium text-stone-600 hidden sm:table-cell">Dishes</th>
+                    <th className="text-left px-6 py-3 font-medium text-stone-600">Status</th>
+                    <th className="px-6 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {allSubmissions.map((submission) => (
+                    <tr key={submission.id} className="hover:bg-stone-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-stone-900">
+                        {submission.restaurants?.name || 'Unknown'}
+                      </td>
+                      <td className="px-6 py-4 text-stone-500 hidden sm:table-cell">
+                        {new Date(submission.submitted_at).toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                        })}
+                      </td>
+                      <td className="px-6 py-4 text-stone-500 hidden sm:table-cell">
+                        {(submission.dishes || []).length}
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={submission.status} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/admin/submissions/${submission.id}`}
+                          className="text-[#2d6a4f] hover:underline font-medium whitespace-nowrap"
+                        >
+                          Review →
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Farms tab ───────────────────────────────────────────────────────── */}
+      {activeTab === 'farms' && (
+        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+          {allFarms.length === 0 ? (
+            <div className="p-8 text-center text-stone-500 text-sm">No farm applications found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-stone-200">
+                    <th className="text-left px-6 py-3 font-medium text-stone-600">Farm Name</th>
+                    <th className="text-left px-6 py-3 font-medium text-stone-600 hidden md:table-cell">Location</th>
+                    <th className="text-left px-6 py-3 font-medium text-stone-600 hidden md:table-cell">Applied</th>
+                    <th className="text-left px-6 py-3 font-medium text-stone-600 hidden sm:table-cell">Certification</th>
+                    <th className="text-left px-6 py-3 font-medium text-stone-600">Status</th>
+                    <th className="px-6 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {allFarms.map((farm) => (
+                    <tr key={farm.id} className="hover:bg-stone-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-stone-900">{farm.name}</td>
+                      <td className="px-6 py-4 text-stone-500 hidden md:table-cell">{farm.city}, {farm.state}</td>
+                      <td className="px-6 py-4 text-stone-500 hidden md:table-cell">
+                        {new Date(farm.created_at).toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                        })}
+                      </td>
+                      <td className="px-6 py-4 hidden sm:table-cell">
+                        {farm.cert_type ? (
+                          <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${
+                            farm.cert_type === 'usda'
+                              ? 'bg-green-100 text-green-800'
+                              : farm.cert_type === 'none'
+                              ? 'bg-stone-100 text-stone-500'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {farm.cert_type === 'usda' ? 'USDA Organic'
+                              : farm.cert_type === 'aga' ? 'AGA'
+                              : farm.cert_type === 'raa' ? 'Regen. Organic'
+                              : farm.cert_type === 'other' ? (farm.cert_other || 'Other')
+                              : 'None'}
+                          </span>
+                        ) : (
+                          <span className="text-stone-400 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={farm.status} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/admin/farms/${farm.id}`}
+                          className="text-[#2d6a4f] hover:underline font-medium whitespace-nowrap"
+                        >
+                          Review →
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

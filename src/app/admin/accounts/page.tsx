@@ -192,7 +192,7 @@ export default function AccountsPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-stone-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-stone-100 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
         {(['admins', 'restaurants', 'farms'] as Tab[]).map((t) => (
           <button
             key={t}

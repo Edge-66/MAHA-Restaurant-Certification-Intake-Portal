@@ -116,6 +116,9 @@ export async function submitApplication(
         produce_types: (formData.get('produce_types') as string) || null,
         regenerative_practices: (formData.get('regenerative_practices') as string) || null,
         certifications: (formData.get('certifications') as string) || null,
+        cert_type: (formData.get('farm_cert_type') as string) || null,
+        cert_other: (formData.get('farm_cert_other') as string) || null,
+        cert_file_url: (formData.get('farm_cert_file_url') as string) || null,
         health_practices: farmHealthPractices.length > 0 ? farmHealthPractices : null,
       };
 

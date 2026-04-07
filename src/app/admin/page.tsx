@@ -106,7 +106,7 @@ export default async function AdminDashboard() {
         <div className="bg-white border border-stone-200 rounded-xl">
           <div className="flex items-center justify-between p-6 border-b border-stone-200">
             <h2 className="text-lg font-semibold text-stone-900">Recent Farms</h2>
-            <Link href="/admin/farms" className="text-sm text-[#2d6a4f] hover:underline font-medium">
+            <Link href="/admin/submissions?tab=farms" className="text-sm text-[#2d6a4f] hover:underline font-medium">
               View All →
             </Link>
           </div>

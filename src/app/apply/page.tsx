@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import DishFormSection from '@/components/DishFormSection';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
-import { submitApplication } from '@/lib/actions';
+import { submitApplication, uploadCertFile } from '@/lib/actions';
 
 const HEALTH_PRACTICE_OPTIONS = [
   'Locally sourced ingredients',
@@ -52,6 +52,13 @@ export default function ApplyPage() {
 
   const [healthPractices, setHealthPractices] = useState<string[]>([]);
   const [otherPractice, setOtherPractice] = useState('');
+
+  // Farm certification state
+  const [farmCertUsdaYes, setFarmCertUsdaYes] = useState<boolean | null>(null);
+  const [farmCertType, setFarmCertType] = useState('');
+  const [farmCertOther, setFarmCertOther] = useState('');
+  const [farmCertFileUrl, setFarmCertFileUrl] = useState('');
+  const [farmCertUploading, setFarmCertUploading] = useState(false);
 
   function togglePractice(label: string) {
     setHealthPractices((prev) =>
@@ -107,6 +114,12 @@ export default function ApplyPage() {
       }
     }
 
+    if (s === 3 && applicantType === 'farm') {
+      if (farmCertUsdaYes === null) return 'Please answer the USDA Organic certification question.';
+      if (farmCertUsdaYes === false && !farmCertType) return 'Please select your certification type.';
+      if (farmCertType === 'other' && !farmCertOther.trim()) return 'Please enter the name of your certification.';
+    }
+
     return '';
   }
 
@@ -149,6 +162,13 @@ export default function ApplyPage() {
     ];
     formData.set('health_practices_json', JSON.stringify(allPractices));
 
+    if (applicantType === 'farm') {
+      const resolvedCertType = farmCertUsdaYes ? 'usda' : farmCertType;
+      formData.set('farm_cert_type', resolvedCertType);
+      if (farmCertOther) formData.set('farm_cert_other', farmCertOther);
+      if (farmCertFileUrl) formData.set('farm_cert_file_url', farmCertFileUrl);
+    }
+
     try {
       const result = await submitApplication(formData);
       if (result?.error) setError(result.error);
@@ -179,15 +199,20 @@ export default function ApplyPage() {
           const active = i === step;
           return (
             <div key={i} className="flex flex-col items-center gap-1.5 z-10">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300 ${
-                done ? 'bg-[#2d6a4f] border-[#2d6a4f] text-white'
-                  : active ? 'bg-white border-[#2d6a4f] text-[#2d6a4f]'
-                  : 'bg-white border-stone-300 text-stone-400'
-              }`}>
+              <button
+                type="button"
+                disabled={!done}
+                onClick={() => { if (done) { setStepError(''); setStep(i); window.scrollTo({ top: 0, behavior: 'smooth' }); } }}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300 ${
+                  done ? 'bg-[#2d6a4f] border-[#2d6a4f] text-white cursor-pointer hover:bg-[#1b4332] hover:border-[#1b4332]'
+                    : active ? 'bg-white border-[#2d6a4f] text-[#2d6a4f] cursor-default'
+                    : 'bg-white border-stone-300 text-stone-400 cursor-default'
+                }`}
+              >
                 {done
                   ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   : i + 1}
-              </div>
+              </button>
               <span className={`text-xs font-medium hidden sm:block ${active ? 'text-[#2d6a4f]' : done ? 'text-stone-500' : 'text-stone-400'}`}>
                 {s.label}
               </span>
@@ -429,61 +454,125 @@ export default function ApplyPage() {
                     <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Regenerative / Sustainable Practices</label>
-                    <textarea name="regenerative_practices" rows={3} className={inp} placeholder="e.g. Rotational grazing, Cover cropping, No-till, Composting" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Certifications</label>
-                    <input type="text" name="certifications" className={inp} placeholder="e.g. USDA Organic, Certified Humane, AGA Certified" />
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Regenerative / Better Health Practices</label>
+                    <textarea name="regenerative_practices" rows={3} className={inp} placeholder="Describe any regenerative, sustainable, or better health practices your farm follows…" />
                   </div>
                 </div>
               </div>
 
-              {/* Better Health Practices — farms */}
+              {/* Farm Certification */}
               <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
-                <h2 className="text-xl font-semibold text-stone-900 mb-1">Better Health Practices</h2>
-                <p className="text-sm text-stone-500 mb-5">
-                  Select any practices your farm follows. These appear on your public profile and help restaurants find the right supplier.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-                  {HEALTH_PRACTICE_OPTIONS.map((label) => {
-                    const checked = healthPractices.includes(label);
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => togglePractice(label)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
-                          checked
-                            ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
-                            : 'border-stone-200 text-stone-600 hover:border-stone-300'
-                        }`}
-                      >
-                        <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                          checked ? 'bg-[#2d6a4f] border-[#2d6a4f]' : 'border-stone-300'
-                        }`}>
-                          {checked && (
-                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </span>
-                        {label}
-                      </button>
-                    );
-                  })}
+                <h2 className="text-xl font-semibold text-stone-900 mb-1">Certification</h2>
+                <p className="text-sm text-stone-500 mb-5">Tell us about your farm&apos;s certifications. This helps restaurants find verified suppliers.</p>
+
+                {/* USDA Organic yes/no */}
+                <p className="text-sm font-medium text-stone-700 mb-3">Is your farm USDA Organic Certified? <span className="text-red-500">*</span></p>
+                <div className="flex gap-3 mb-5">
+                  {([true, false] as const).map((val) => (
+                    <button
+                      key={String(val)}
+                      type="button"
+                      onClick={() => { setFarmCertUsdaYes(val); setFarmCertType(''); setFarmCertOther(''); setFarmCertFileUrl(''); }}
+                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                        farmCertUsdaYes === val
+                          ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
+                          : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                      }`}
+                    >
+                      {val ? 'Yes' : 'No'}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Other practices</label>
-                  <input
-                    type="text"
-                    value={otherPractice}
-                    onChange={(e) => setOtherPractice(e.target.value)}
-                    className={inp}
-                    placeholder="e.g. Heritage breeds, Biodynamic, Direct-to-consumer…"
-                  />
-                  <p className="text-xs text-stone-400 mt-1">Optional — anything not listed above.</p>
-                </div>
+
+                {/* USDA confirmed */}
+                {farmCertUsdaYes === true && (
+                  <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                    <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <p className="text-sm text-emerald-800 font-medium">USDA Organic Certified — you&apos;re all set.</p>
+                  </div>
+                )}
+
+                {/* Non-USDA options */}
+                {farmCertUsdaYes === false && (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-stone-700 mb-3">Which best describes your certification? <span className="text-red-500">*</span></p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { value: 'aga', label: 'American Grassfed (AGA)' },
+                          { value: 'raa', label: 'Regenerative Organic Certified' },
+                          { value: 'other', label: 'Other Certification' },
+                          { value: 'none', label: 'None / In Progress' },
+                        ].map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => { setFarmCertType(value); setFarmCertOther(''); setFarmCertFileUrl(''); }}
+                            className={`px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
+                              farmCertType === value
+                                ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
+                                : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {farmCertType === 'other' && (
+                      <div>
+                        <label className="block text-sm font-medium text-stone-700 mb-1">Certification name <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          value={farmCertOther}
+                          onChange={(e) => setFarmCertOther(e.target.value)}
+                          className={inp}
+                          placeholder="e.g. Certified Humane, Animal Welfare Approved…"
+                        />
+                      </div>
+                    )}
+
+                    {(farmCertType === 'aga' || farmCertType === 'raa' || farmCertType === 'other') && (
+                      <div>
+                        <label className="block text-sm font-medium text-stone-700 mb-1">Upload certification document</label>
+                        <p className="text-xs text-stone-400 mb-2">PDF, PNG, or JPG — optional but recommended for faster verification.</p>
+                        {farmCertFileUrl ? (
+                          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                            <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span className="text-xs text-emerald-800 flex-1 truncate">Document uploaded</span>
+                            <button type="button" onClick={() => setFarmCertFileUrl('')} className="text-xs text-stone-400 hover:text-stone-600">Remove</button>
+                          </div>
+                        ) : (
+                          <label className={`flex items-center gap-2 px-4 py-2.5 border border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors ${farmCertUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                            <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                            <span className="text-sm text-stone-600">{farmCertUploading ? 'Uploading…' : 'Choose file'}</span>
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg"
+                              className="hidden"
+                              disabled={farmCertUploading}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setFarmCertUploading(true);
+                                try {
+                                  const fd = new FormData();
+                                  fd.append('file', file);
+                                  fd.append('context', 'farm_cert');
+                                  const result = await uploadCertFile(fd);
+                                  if (result?.url) setFarmCertFileUrl(result.url);
+                                } catch { /* ignore upload errors */ } finally {
+                                  setFarmCertUploading(false);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -539,20 +628,20 @@ export default function ApplyPage() {
       </form>
 
       {/* Navigation */}
-      {step < 4 && (
-        <div className={`flex ${step > 0 ? 'justify-between' : 'justify-end'} mt-6`}>
-          {step > 0 && (
-            <button type="button" onClick={handleBack} className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-700 px-4 py-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 transition-colors">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-              Back
-            </button>
-          )}
+      <div className={`flex mt-6 ${step === 0 ? 'justify-end' : step < 4 ? 'justify-between' : 'justify-start'}`}>
+        {step > 0 && (
+          <button type="button" onClick={handleBack} className="flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-700 px-4 py-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+            Back
+          </button>
+        )}
+        {step < 4 && (
           <button type="button" onClick={handleNext} className="flex items-center gap-1.5 bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1b4332] transition-colors">
             Continue
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

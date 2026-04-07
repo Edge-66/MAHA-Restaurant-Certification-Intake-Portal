@@ -7,7 +7,6 @@ import ProfileDropdown from '@/components/ProfileDropdown';
 const navItems = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/submissions', label: 'Submissions' },
-  { href: '/admin/farms', label: 'Farms' },
 ];
 
 const tier3Items = [

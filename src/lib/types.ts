@@ -92,6 +92,9 @@ export interface Farm {
   produce_types: string | null;
   regenerative_practices: string | null;
   certifications: string | null;
+  cert_type: 'usda' | 'aga' | 'raa' | 'other' | 'none' | null;
+  cert_other: string | null;
+  cert_file_url: string | null;
   health_practices: string[] | null;
   hero_image_url: string | null;
   photo_urls: string | null;
