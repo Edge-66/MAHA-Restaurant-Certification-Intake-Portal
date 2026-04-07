@@ -61,10 +61,10 @@ export default async function RestaurantDashboard() {
             </Link>
           )}
           <Link
-            href="/apply"
+            href="/dashboard/restaurant/add-dishes"
             className="bg-[#2d6a4f] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1b4332] transition-colors"
           >
-            Submit New Dishes
+            Certify new dishes
           </Link>
         </div>
       </div>
@@ -157,10 +157,10 @@ export default async function RestaurantDashboard() {
             <div className="px-6 py-10 text-center text-stone-500 text-sm">
               <p className="mb-4">No submissions yet.</p>
               <Link
-                href="/apply"
+                href="/dashboard/restaurant/add-dishes"
                 className="inline-block bg-[#2d6a4f] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#1b4332] transition-colors"
               >
-                Submit Your First Dishes
+                Certify your first dishes
               </Link>
             </div>
           ) : (

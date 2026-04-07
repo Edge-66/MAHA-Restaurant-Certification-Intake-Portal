@@ -8,15 +8,18 @@ import { createClient } from '@/lib/supabase/client';
 
 const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400' });
 
-const NAV_ITEMS = [
+const BASE_NAV = [
   { label: 'Directory', href: '/directory' },
   { label: 'How It Works', href: '/about-certification' },
-  { label: 'Apply Now', href: '/apply' },
-];
+] as const;
 
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [dashboardHref, setDashboardHref] = useState<string | null>(null);
+  const [applyNav, setApplyNav] = useState<{ label: string; href: string }>({
+    label: 'Apply Now',
+    href: '/apply',
+  });
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isHome = pathname === '/';
@@ -27,24 +30,44 @@ export default function Header() {
   // Check auth state to show correct nav link
   useEffect(() => {
     const supabase = createClient();
+    function syncNav(profileRole: string | undefined) {
+      if (profileRole === 'restaurant') {
+        setDashboardHref('/dashboard/restaurant');
+        setApplyNav({ label: 'Certify new dishes', href: '/dashboard/restaurant/add-dishes' });
+      } else if (profileRole === 'farm') {
+        setDashboardHref('/dashboard/farm');
+        setApplyNav({ label: 'Farm dashboard', href: '/dashboard/farm' });
+      } else if (profileRole === 'admin') {
+        setDashboardHref('/admin');
+        setApplyNav({ label: 'Apply Now', href: '/apply' });
+      } else {
+        setDashboardHref('/admin');
+        setApplyNav({ label: 'Apply Now', href: '/apply' });
+      }
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) { setDashboardHref(null); return; }
+      if (!session) {
+        setDashboardHref(null);
+        setApplyNav({ label: 'Apply Now', href: '/apply' });
+        return;
+      }
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
         .single();
-      if (profile?.role === 'restaurant') setDashboardHref('/dashboard/restaurant');
-      else if (profile?.role === 'farm') setDashboardHref('/dashboard/farm');
-      else setDashboardHref('/admin');
+      syncNav(profile?.role);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) { setDashboardHref(null); return; }
+      if (!session) {
+        setDashboardHref(null);
+        setApplyNav({ label: 'Apply Now', href: '/apply' });
+        return;
+      }
       supabase.from('profiles').select('role').eq('id', session.user.id).single().then(({ data: profile }) => {
-        if (profile?.role === 'restaurant') setDashboardHref('/dashboard/restaurant');
-        else if (profile?.role === 'farm') setDashboardHref('/dashboard/farm');
-        else setDashboardHref('/admin');
+        syncNav(profile?.role);
       });
     });
     return () => subscription.unsubscribe();
@@ -93,9 +116,9 @@ export default function Header() {
             {open && (
               <div className="absolute right-4 sm:right-6 lg:right-8 top-[calc(100%+4px)] w-56 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
                 <nav className="py-2">
-                  {NAV_ITEMS.map(({ label, href }) => (
+                  {[...BASE_NAV, applyNav].map(({ label, href }) => (
                     <Link
-                      key={href}
+                      key={`${label}-${href}`}
                       href={href}
                       className={`block px-4 py-2.5 text-sm font-medium transition-colors ${
                         pathname === href

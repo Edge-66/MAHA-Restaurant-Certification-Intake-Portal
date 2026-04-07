@@ -40,7 +40,8 @@ function isDishPayload(x: unknown): x is DishPayload {
 }
 
 /**
- * Creates a Supabase Auth user, saves the application, links profiles, and signs the user in.
+ * Creates a Supabase Auth user, saves the application, and links profiles.
+ * Redirects to /login so the user signs in explicitly (no automatic session).
  * Requires SUPABASE_SERVICE_ROLE_KEY on the server.
  */
 export async function submitApplication(
@@ -238,23 +239,107 @@ export async function submitApplication(
     return { error: message };
   }
 
-  const supabase = await createClient();
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
   // Send confirmation email (non-blocking)
   const entityName = (formData.get('name') as string) || email;
   sendApplicationConfirmation(email, entityName, applicantType).catch(() => {});
 
-  if (signInError) {
-    redirect(`/login?applied=1&email=${encodeURIComponent(email)}`);
+  redirect(`/login?applied=1&email=${encodeURIComponent(email)}`);
+}
+
+/**
+ * Logged-in restaurants: add one or more dishes as a new pending submission (no full re-application).
+ */
+export async function submitAdditionalRestaurantDishes(
+  formData: FormData
+): Promise<{ error: string } | void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, restaurant_id')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || profile.role !== 'restaurant' || !profile.restaurant_id) {
+    return { error: 'Unauthorized.' };
   }
 
-  if (applicantType === 'farm') {
-    redirect('/dashboard/farm');
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: 'Server configuration error.' };
   }
+
+  const restaurantId = profile.restaurant_id;
+
+  let dishes: unknown[];
+  try {
+    dishes = JSON.parse((formData.get('dishes_json') as string) || '[]');
+  } catch {
+    return { error: 'Invalid dish data.' };
+  }
+  if (!Array.isArray(dishes) || dishes.length === 0) {
+    return { error: 'Add at least one dish.' };
+  }
+  if (!dishes.every(isDishPayload)) {
+    return { error: 'Each dish must include name, category, main element, supplier, and attestations.' };
+  }
+
+  const { data: submission, error: sError } = await admin
+    .from('submissions')
+    .insert({ restaurant_id: restaurantId })
+    .select('id')
+    .single();
+
+  if (sError || !submission) {
+    return { error: sError?.message ?? 'Failed to create submission.' };
+  }
+
+  try {
+    for (const dish of dishes) {
+      const { error: dError } = await admin.from('dishes').insert({
+        submission_id: submission.id,
+        restaurant_id: restaurantId,
+        name: dish.name,
+        category: dish.category,
+        description: dish.description || null,
+        main_element: dish.main_element,
+        supplier_name: dish.supplier_name,
+        supplier_city: dish.supplier_city || null,
+        supplier_state: dish.supplier_state || null,
+        supplier_website: dish.supplier_website || null,
+        supplier_certifications: dish.supplier_certifications || null,
+        main_element_cert_type: dish.main_element_cert_type || null,
+        main_element_cert_other: dish.main_element_cert_other || null,
+        meets_non_negotiables: dish.meets_non_negotiables,
+        cert_file_url: dish.cert_file_url || null,
+        notes: dish.notes || null,
+      });
+      if (dError) throw new Error(dError.message);
+    }
+  } catch (err) {
+    await admin.from('submissions').delete().eq('id', submission.id);
+    const message = err instanceof Error ? err.message : 'Failed to save dishes.';
+    return { error: message };
+  }
+
+  const { data: restaurant } = await admin
+    .from('restaurants')
+    .select('name, contact_email')
+    .eq('id', restaurantId)
+    .single();
+
+  if (restaurant?.contact_email) {
+    sendApplicationConfirmation(
+      restaurant.contact_email,
+      restaurant.name,
+      'restaurant'
+    ).catch(() => {});
+  }
+
   redirect('/dashboard/restaurant');
 }
 

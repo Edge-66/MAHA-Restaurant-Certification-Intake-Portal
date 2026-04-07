@@ -63,6 +63,17 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Full public application: not available while signed in as farm/restaurant (use dashboard instead)
+  if (path === '/apply' || path.startsWith('/apply/')) {
+    if (user) {
+      const role = await profileRole();
+      if (role === 'farm') return redirectTo('/dashboard/farm');
+      if (role === 'restaurant') return redirectTo('/dashboard/restaurant/add-dishes');
+      if (role === 'admin') return redirectTo('/admin');
+    }
+    return supabaseResponse;
+  }
+
   // Role-specific dashboards
   if (path.startsWith('/dashboard')) {
     if (!user) {
@@ -104,5 +115,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/dashboard/:path*', '/login'],
+  matcher: ['/admin/:path*', '/dashboard/:path*', '/login', '/apply', '/apply/:path*'],
 };
