@@ -262,29 +262,49 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
-                icon: '📍',
+                icon: (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                  </svg>
+                ),
                 title: 'Identified Supplier',
                 desc: 'The farm or producer behind each main ingredient must be named — no anonymous distributors.',
               },
               {
-                icon: '🌱',
+                icon: (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c-1.2 5.4-5 7.8-5 11a5 5 0 0 0 10 0c0-3.2-3.8-5.6-5-11Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 14v4" />
+                  </svg>
+                ),
                 title: 'Local & Regional',
                 desc: 'We prioritize suppliers within the region, supporting shorter supply chains and fresher ingredients.',
               },
               {
-                icon: '📋',
+                icon: (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                ),
                 title: 'Verifiable Practices',
                 desc: 'Suppliers should be able to back up sourcing claims with documentation or certifications when asked.',
               },
               {
-                icon: '🤝',
+                icon: (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+                  </svg>
+                ),
                 title: 'Honest Representation',
                 desc: 'Restaurants must accurately represent how dishes are prepared and what ingredients are truly local.',
               },
             ].map((item, i) => (
               <Reveal key={i} delay={i * 80}>
                 <div className="bg-stone-50 border border-stone-100 rounded-xl p-6 h-full">
-                  <div className="text-3xl mb-4">{item.icon}</div>
+                  <div className="w-11 h-11 bg-[#2d6a4f]/10 rounded-xl flex items-center justify-center text-[#2d6a4f] mb-4">
+                    {item.icon}
+                  </div>
                   <h3 className="font-semibold text-stone-900 mb-2">{item.title}</h3>
                   <p className="text-sm text-stone-500 leading-relaxed">{item.desc}</p>
                 </div>
