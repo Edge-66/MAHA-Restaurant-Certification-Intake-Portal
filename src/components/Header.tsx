@@ -1,11 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Great_Vibes } from 'next/font/google';
+import { Fraunces, Great_Vibes } from 'next/font/google';
 import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+const mahaWordmark = Fraunces({
+  subsets: ['latin'],
+  weight: ['600', '700'],
+});
 const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400' });
 
 const BASE_NAV = [
@@ -75,26 +79,28 @@ export default function Header() {
 
   return (
     <header className={`${isHome ? 'absolute' : 'relative'} top-0 left-0 right-0 z-50 border-b ${isHome ? 'bg-transparent border-white/10' : 'bg-[#2d6a4f] border-[#1b4332]'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
-        <div className="flex justify-between items-center h-16">
+      <div className="w-full pl-2 pr-2 sm:pl-3 sm:pr-3 md:pl-4 md:pr-4">
+        <div className="flex justify-between items-center h-16 gap-2">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-white">
-              MAHA{' '}
-              <span className={`${greatVibes.className} text-2xl font-normal text-green-200`}>
-                From the Farm
-              </span>
+          <Link href="/" className="flex items-center gap-1.5 min-w-0 shrink">
+            <span
+              className={`${mahaWordmark.className} text-xl sm:text-[1.35rem] font-semibold text-white tracking-tight`}
+            >
+              MAHA
+            </span>
+            <span className={`${greatVibes.className} text-2xl font-normal text-green-200 leading-none`}>
+              From the Farm
             </span>
           </Link>
 
           {/* Hamburger button — three horizontal lines */}
-          <div ref={menuRef} className="ml-auto">
+          <div ref={menuRef} className="ml-auto shrink-0 -mr-0.5 sm:-mr-1">
             <button
               onClick={() => setOpen(!open)}
               aria-label="Toggle menu"
               aria-expanded={open}
-              className="flex flex-col justify-center gap-[5px] w-10 h-10 rounded-lg hover:bg-white/10 transition-colors px-2"
+              className="flex flex-col justify-center gap-[5px] w-10 h-10 rounded-lg hover:bg-white/10 transition-colors px-1.5"
             >
               <span className="block w-full h-[2px] bg-white rounded-full" />
               <span className="block w-full h-[2px] bg-white rounded-full" />
@@ -103,7 +109,7 @@ export default function Header() {
 
             {/* Dropdown */}
             {open && (
-              <div className="absolute right-4 sm:right-6 lg:right-8 top-[calc(100%+4px)] w-56 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
+              <div className="absolute right-0 top-[calc(100%+4px)] w-56 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
                 <nav className="py-2">
                   {navLinks.map(({ label, href }) => (
                     <Link
