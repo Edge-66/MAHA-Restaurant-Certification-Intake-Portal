@@ -207,6 +207,24 @@ export default async function RestaurantDashboard() {
           )}
         </div>
 
+        {/* Health Practices */}
+        {restaurant.health_practices && restaurant.health_practices.length > 0 && (
+          <div className="bg-white border border-stone-200 rounded-xl p-6">
+            <h2 className="font-semibold text-stone-900 mb-3">Better Health Practices</h2>
+            <div className="flex flex-wrap gap-2">
+              {restaurant.health_practices.map((p: string) => (
+                <span key={p} className="inline-flex items-center gap-1.5 bg-[#2d6a4f]/8 text-[#2d6a4f] text-xs font-medium px-3 py-1.5 rounded-full border border-[#2d6a4f]/20">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {p}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-stone-400 mt-3">To update your practices, contact MAHA directly.</p>
+          </div>
+        )}
+
         {/* Restaurant info */}
         <div className="bg-white border border-stone-200 rounded-xl p-6">
           <h2 className="font-semibold text-stone-900 mb-4">Your Info on File</h2>

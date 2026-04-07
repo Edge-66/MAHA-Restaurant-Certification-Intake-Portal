@@ -150,6 +150,23 @@ export async function sendSubmissionDecision(
   await send(to, `${label} — ${restaurantName}`, base(headline, content));
 }
 
+// ─── Password Reset ───────────────────────────────────────────────────────────
+
+export async function sendPasswordResetEmail(to: string, resetLink: string) {
+  const content = `
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#1c1917;">Reset your password</h1>
+    <p style="margin:0 0 20px;font-size:14px;color:#78716c;">
+      A password reset was requested for your MAHA From the Farm account. Click the button below to set a new password.
+      This link expires in 24 hours.
+    </p>
+    ${btn('Reset Password', resetLink)}
+    <p style="margin:20px 0 0;font-size:12px;color:#a8a29e;">
+      If you didn't request this, you can safely ignore this email. Your password will not change.
+    </p>
+  `;
+  await send(to, 'Reset your MAHA From the Farm password', base('Reset your password', content));
+}
+
 // ─── Farm Decision ────────────────────────────────────────────────────────────
 
 export async function sendFarmDecision(to: string, farmName: string, status: string) {

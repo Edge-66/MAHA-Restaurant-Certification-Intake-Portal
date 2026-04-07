@@ -10,13 +10,29 @@ const navItems = [
   { href: '/admin/farms', label: 'Farms' },
 ];
 
+const tier3Items = [
+  { href: '/admin/permissions', label: 'Permissions' },
+  { href: '/admin/accounts', label: 'Accounts' },
+];
+
 const publicItems = [
   { href: '/directory', label: 'Directory' },
   { href: '/about-certification', label: 'How It Works' },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ adminTier = 1 }: { adminTier?: number }) {
   const pathname = usePathname();
+
+  function isActive(href: string) {
+    return href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+  }
+
+  const linkClass = (href: string) =>
+    `flex items-center gap-3 px-3 py-2 md:py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
+      isActive(href)
+        ? 'bg-[#2d6a4f] text-white'
+        : 'text-green-200 hover:bg-[#2d6a4f]/50 hover:text-white'
+    }`;
 
   return (
     <aside className="bg-[#1b4332] text-white md:w-64 md:min-h-screen flex-shrink-0">
@@ -34,27 +50,45 @@ export default function AdminSidebar() {
       {/* Nav */}
       <nav className="p-2 md:flex-1 md:p-4 overflow-x-auto">
         <ul className="flex md:flex-col gap-1 md:space-y-1">
-          {navItems.map((item) => {
-            const isActive =
-              item.href === '/admin'
-                ? pathname === '/admin'
-                : pathname.startsWith(item.href);
-            return (
+          {navItems.map((item) => (
+            <li key={item.href} className="flex-shrink-0">
+              <Link href={item.href} className={linkClass(item.href)}>
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        {/* Tier 3 section */}
+        {adminTier >= 3 && (
+          <div className="hidden md:block mt-6">
+            <p className="text-xs font-semibold text-green-500 uppercase tracking-wider mb-2 px-1">
+              Super Admin
+            </p>
+            <ul className="space-y-1">
+              {tier3Items.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} className={linkClass(item.href)}>
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Tier 3 mobile items */}
+        {adminTier >= 3 && (
+          <ul className="flex md:hidden gap-1 mt-1">
+            {tier3Items.map((item) => (
               <li key={item.href} className="flex-shrink-0">
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 md:py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap ${
-                    isActive
-                      ? 'bg-[#2d6a4f] text-white'
-                      : 'text-green-200 hover:bg-[#2d6a4f]/50 hover:text-white'
-                  }`}
-                >
+                <Link href={item.href} className={linkClass(item.href)}>
                   {item.label}
                 </Link>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        )}
       </nav>
 
       {/* Public site links — desktop only */}

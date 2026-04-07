@@ -7,6 +7,7 @@ import {
   sendApplicationConfirmation,
   sendSubmissionDecision,
   sendFarmDecision,
+  sendPasswordResetEmail,
 } from '@/lib/email';
 
 type DishPayload = {
@@ -94,6 +95,12 @@ export async function submitApplication(
 
   try {
     if (applicantType === 'farm') {
+      let farmHealthPractices: string[] = [];
+      try {
+        const raw = formData.get('health_practices_json') as string | null;
+        if (raw) farmHealthPractices = JSON.parse(raw);
+      } catch { /* ignore */ }
+
       const farmData = {
         name: formData.get('name') as string,
         contact_name: formData.get('contact_name') as string,
@@ -109,6 +116,7 @@ export async function submitApplication(
         produce_types: (formData.get('produce_types') as string) || null,
         regenerative_practices: (formData.get('regenerative_practices') as string) || null,
         certifications: (formData.get('certifications') as string) || null,
+        health_practices: farmHealthPractices.length > 0 ? farmHealthPractices : null,
       };
 
       const { data: farm, error: fError } = await admin
@@ -145,6 +153,12 @@ export async function submitApplication(
         throw new Error('Each dish must include name, category, main element, supplier, and attestations.');
       }
 
+      let healthPractices: string[] = [];
+      try {
+        const raw = formData.get('health_practices_json') as string | null;
+        if (raw) healthPractices = JSON.parse(raw);
+      } catch { /* ignore */ }
+
       const restaurantData = {
         name: formData.get('name') as string,
         contact_name: formData.get('contact_name') as string,
@@ -157,6 +171,7 @@ export async function submitApplication(
         zip: formData.get('zip') as string,
         participation_level: 'participant' as const,
         description: (formData.get('description') as string) || null,
+        health_practices: healthPractices.length > 0 ? healthPractices : null,
       };
 
       const { data: restaurant, error: rError } = await admin
@@ -343,6 +358,9 @@ export async function updateAdminTier(
     .single();
 
   if ((callerProfile?.admin_tier ?? 1) < 3) return { error: 'Insufficient permissions.' };
+
+  const masterErr = await assertNotMaster(targetId);
+  if (masterErr) return masterErr;
 
   const { error } = await supabase
     .from('profiles')
@@ -544,7 +562,8 @@ export async function notifySubmissionDecision(
     .eq('id', submissionId)
     .single();
 
-  const restaurant = (data?.restaurants as { id: string; name: string; contact_email: string } | null);
+  const restaurantsRaw = data?.restaurants;
+  const restaurant = (Array.isArray(restaurantsRaw) ? restaurantsRaw[0] : restaurantsRaw) as { id: string; name: string; contact_email: string } | null;
   if (!restaurant) return;
 
   // Get user_id linked to this restaurant
@@ -575,6 +594,301 @@ export async function notifySubmissionDecision(
     const body = bodies[newStatus] ?? '';
     await createNotification(profile.id, title, body, '/dashboard/restaurant');
   }
+}
+
+// ─── Tier-3 helpers ───────────────────────────────────────────────────────────
+
+async function assertTier3(): Promise<{ error: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+  const { data: profile } = await supabase
+    .from('profiles').select('admin_tier').eq('id', user.id).single();
+  if ((profile?.admin_tier ?? 1) < 3) return { error: 'Insufficient permissions.' };
+  return null;
+}
+
+// ─── Password reset ───────────────────────────────────────────────────────────
+
+export async function sendPasswordReset(targetUserId: string): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const admin = createAdminClient();
+  const { data: userData, error: getUserErr } = await admin.auth.admin.getUserById(targetUserId);
+  if (getUserErr || !userData.user?.email) return { error: 'User not found.' };
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+    type: 'recovery',
+    email: userData.user.email,
+    options: { redirectTo: `${siteUrl}/reset-password` },
+  });
+
+  if (linkErr || !linkData.properties?.action_link) {
+    return { error: linkErr?.message ?? 'Could not generate reset link.' };
+  }
+
+  await sendPasswordResetEmail(userData.user.email, linkData.properties.action_link);
+  return {};
+}
+
+export async function sendPasswordResetForFarm(farmId: string): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from('profiles').select('id').eq('farm_id', farmId).single();
+  if (!profile?.id) return { error: 'No user account linked to this farm.' };
+
+  return sendPasswordReset(profile.id);
+}
+
+export async function sendPasswordResetForRestaurant(restaurantId: string): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from('profiles').select('id').eq('restaurant_id', restaurantId).single();
+  if (!profile?.id) return { error: 'No user account linked to this restaurant.' };
+
+  return sendPasswordReset(profile.id);
+}
+
+// ─── Master account protection ───────────────────────────────────────────────
+
+async function assertNotMaster(targetUserId: string): Promise<{ error?: string } | null> {
+  const masterEmail = process.env.MASTER_ADMIN_EMAIL;
+  if (!masterEmail) return null;
+  const admin = createAdminClient();
+  const { data } = await admin.auth.admin.getUserById(targetUserId);
+  if (data.user?.email?.toLowerCase() === masterEmail.toLowerCase()) {
+    return { error: 'The master admin account cannot be modified.' };
+  }
+  return null;
+}
+
+// ─── Delete admin account ─────────────────────────────────────────────────────
+
+export async function deleteAdminAccount(targetId: string): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user?.id === targetId) return { error: 'You cannot delete your own account.' };
+
+  const masterErr = await assertNotMaster(targetId);
+  if (masterErr) return masterErr;
+
+  // Verify target is an admin
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', targetId).single();
+  if (profile?.role !== 'admin') return { error: 'Target account is not an admin.' };
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(targetId);
+  if (error) return { error: error.message };
+  return {};
+}
+
+// ─── Delete farm ──────────────────────────────────────────────────────────────
+
+export async function deleteFarm(farmId: string): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from('profiles').select('id').eq('farm_id', farmId).single();
+
+  // Delete farm record (RLS allows admin; uploads/notifications cascade via FK or we clean up)
+  const { error: farmErr } = await supabase.from('farms').delete().eq('id', farmId);
+  if (farmErr) return { error: farmErr.message };
+
+  // Delete auth user (cascades profile via FK)
+  if (profile?.id) {
+    const admin = createAdminClient();
+    await admin.auth.admin.deleteUser(profile.id);
+  }
+
+  return {};
+}
+
+// ─── Delete restaurant account ────────────────────────────────────────────────
+
+export async function deleteRestaurantAccount(restaurantId: string): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from('profiles').select('id').eq('restaurant_id', restaurantId).single();
+
+  // Delete dishes, then submissions, then restaurant
+  await supabase.from('dishes').delete().eq('restaurant_id', restaurantId);
+  await supabase.from('submissions').delete().eq('restaurant_id', restaurantId);
+  const { error: rErr } = await supabase.from('restaurants').delete().eq('id', restaurantId);
+  if (rErr) return { error: rErr.message };
+
+  if (profile?.id) {
+    const admin = createAdminClient();
+    await admin.auth.admin.deleteUser(profile.id);
+  }
+
+  return {};
+}
+
+// ─── Delete dish ──────────────────────────────────────────────────────────────
+
+export async function deleteDish(dishId: string): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const supabase = await createClient();
+  const { data: dish } = await supabase
+    .from('dishes').select('restaurant_id').eq('id', dishId).single();
+
+  const { error } = await supabase.from('dishes').delete().eq('id', dishId);
+  if (error) return { error: error.message };
+
+  // Re-sync participation_level
+  if (dish?.restaurant_id) {
+    const { count } = await supabase
+      .from('dishes').select('id', { count: 'exact', head: true })
+      .eq('restaurant_id', dish.restaurant_id).eq('status', 'approved');
+    const newLevel = (count ?? 0) >= 7 ? 'certified' : 'participant';
+    await supabase.from('restaurants').update({ participation_level: newLevel }).eq('id', dish.restaurant_id);
+  }
+
+  return {};
+}
+
+// ─── Get restaurant / farm user lists ────────────────────────────────────────
+
+export interface RestaurantUser {
+  id: string;
+  name: string;
+  contactName: string;
+  email: string;
+  city: string;
+  state: string;
+  participationLevel: string;
+  profileId: string | null;
+}
+
+export interface FarmUser {
+  id: string;
+  name: string;
+  contactName: string;
+  email: string;
+  city: string;
+  state: string;
+  status: string;
+  profileId: string | null;
+}
+
+export async function getRestaurantUsers(): Promise<RestaurantUser[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: p } = await supabase.from('profiles').select('admin_tier').eq('id', user.id).single();
+  if ((p?.admin_tier ?? 1) < 3) return [];
+
+  const { data: restaurants } = await supabase
+    .from('restaurants')
+    .select('id, name, contact_name, contact_email, city, state, participation_level')
+    .order('name');
+  if (!restaurants) return [];
+
+  const ids = restaurants.map((r) => r.id);
+  const { data: profiles } = await supabase
+    .from('profiles').select('id, restaurant_id').in('restaurant_id', ids);
+  const profileMap: Record<string, string> = {};
+  (profiles ?? []).forEach((pr) => { if (pr.restaurant_id) profileMap[pr.restaurant_id] = pr.id; });
+
+  return restaurants.map((r) => ({
+    id: r.id,
+    name: r.name,
+    contactName: r.contact_name,
+    email: r.contact_email,
+    city: r.city,
+    state: r.state,
+    participationLevel: r.participation_level,
+    profileId: profileMap[r.id] ?? null,
+  }));
+}
+
+export async function getFarmUsers(): Promise<FarmUser[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: p } = await supabase.from('profiles').select('admin_tier').eq('id', user.id).single();
+  if ((p?.admin_tier ?? 1) < 3) return [];
+
+  const { data: farms } = await supabase
+    .from('farms')
+    .select('id, name, contact_name, contact_email, city, state, status')
+    .order('name');
+  if (!farms) return [];
+
+  const ids = farms.map((f) => f.id);
+  const { data: profiles } = await supabase
+    .from('profiles').select('id, farm_id').in('farm_id', ids);
+  const profileMap: Record<string, string> = {};
+  (profiles ?? []).forEach((pr) => { if (pr.farm_id) profileMap[pr.farm_id] = pr.id; });
+
+  return farms.map((f) => ({
+    id: f.id,
+    name: f.name,
+    contactName: f.contact_name,
+    email: f.contact_email,
+    city: f.city,
+    state: f.state,
+    status: f.status,
+    profileId: profileMap[f.id] ?? null,
+  }));
+}
+
+// ─── Update user email ────────────────────────────────────────────────────────
+
+export async function updateUserEmail(
+  userId: string,
+  newEmail: string
+): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const masterErr = await assertNotMaster(userId);
+  if (masterErr) return masterErr;
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, { email: newEmail });
+  if (error) return { error: error.message };
+
+  // Sync contact_email on restaurants/farms
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from('profiles').select('role, restaurant_id, farm_id').eq('id', userId).single();
+  if (profile?.role === 'restaurant' && profile.restaurant_id) {
+    await admin.from('restaurants').update({ contact_email: newEmail }).eq('id', profile.restaurant_id);
+  } else if (profile?.role === 'farm' && profile.farm_id) {
+    await admin.from('farms').update({ contact_email: newEmail }).eq('id', profile.farm_id);
+  }
+
+  return {};
+}
+
+// ─── Get current admin tier (for server components) ──────────────────────────
+
+export async function getMyAdminTier(): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  const { data } = await supabase.from('profiles').select('admin_tier').eq('id', user.id).single();
+  return data?.admin_tier ?? 1;
 }
 
 export async function notifyFarmDecision(farmId: string, newStatus: string): Promise<void> {

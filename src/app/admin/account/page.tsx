@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getAdminUsers, updateAdminTier } from '@/lib/actions';
 
 const TIER_LABELS: Record<number, string> = {
   1: 'Editor',
@@ -24,15 +23,10 @@ const TIER_PERMISSIONS: Record<number, string[]> = {
   3: [
     'Everything in Tier 2 (Reviewer)',
     'Manage admin accounts and permission tiers',
-    'Full portal access',
+    'Remove admin, farm, and restaurant accounts',
+    'Delete dishes and reset passwords for any user',
   ],
 };
-
-interface AdminUser {
-  id: string;
-  email: string;
-  tier: number;
-}
 
 interface ActivityItem {
   type: 'submission' | 'farm';
@@ -43,19 +37,11 @@ interface ActivityItem {
 
 export default function AdminAccountPage() {
   const [email, setEmail] = useState('');
-  const [userId, setUserId] = useState('');
   const [createdAt, setCreatedAt] = useState('');
   const [adminTier, setAdminTier] = useState(1);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
 
-  // Tier 3: admin management
-  const [admins, setAdmins] = useState<AdminUser[]>([]);
-  const [adminsLoading, setAdminsLoading] = useState(false);
-  const [tierUpdating, setTierUpdating] = useState<string | null>(null);
-  const [tierMessage, setTierMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Password change
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
@@ -69,7 +55,6 @@ export default function AdminAccountPage() {
       if (!user) return;
 
       setEmail(user.email ?? '');
-      setUserId(user.id);
       setCreatedAt(user.created_at ?? '');
 
       const { data: profile } = await supabase
@@ -78,10 +63,8 @@ export default function AdminAccountPage() {
         .eq('id', user.id)
         .single();
 
-      const tier = profile?.admin_tier ?? 1;
-      setAdminTier(tier);
+      setAdminTier(profile?.admin_tier ?? 1);
 
-      // Load audit activity
       const [{ data: subs }, { data: farms }] = await Promise.all([
         supabase
           .from('submissions')
@@ -116,31 +99,10 @@ export default function AdminAccountPage() {
       items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setActivity(items.slice(0, 25));
       setActivityLoading(false);
-
-      // Tier 3: load admin list
-      if (tier >= 3) {
-        setAdminsLoading(true);
-        const list = await getAdminUsers();
-        setAdmins(list);
-        setAdminsLoading(false);
-      }
     }
 
     load();
   }, []);
-
-  async function handleTierChange(targetId: string, newTier: number) {
-    setTierUpdating(targetId);
-    setTierMessage(null);
-    const result = await updateAdminTier(targetId, newTier);
-    if (result.error) {
-      setTierMessage({ type: 'error', text: result.error });
-    } else {
-      setAdmins((prev) => prev.map((a) => a.id === targetId ? { ...a, tier: newTier } : a));
-      setTierMessage({ type: 'success', text: 'Permission tier updated.' });
-    }
-    setTierUpdating(null);
-  }
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault();
@@ -169,7 +131,7 @@ export default function AdminAccountPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-stone-900 mb-8">Account Settings</h1>
+      <h1 className="text-2xl font-bold text-stone-900 mb-8">My Account</h1>
 
       {/* Profile */}
       <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
@@ -217,56 +179,6 @@ export default function AdminAccountPage() {
           ))}
         </ul>
       </div>
-
-      {/* Tier 3 only: Admin Management */}
-      {adminTier >= 3 && (
-        <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
-          <h2 className="text-lg font-semibold text-stone-900 mb-1">Admin Accounts</h2>
-          <p className="text-sm text-stone-500 mb-5">Manage permission tiers for all admin accounts.</p>
-
-          {tierMessage && (
-            <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
-              tierMessage.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                : 'bg-red-50 border border-red-200 text-red-700'
-            }`}>
-              {tierMessage.text}
-            </div>
-          )}
-
-          {adminsLoading ? (
-            <div className="text-sm text-stone-400">Loading…</div>
-          ) : (
-            <ul className="divide-y divide-stone-100">
-              {admins.map((admin) => (
-                <li key={admin.id} className="py-3 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-stone-900 truncate max-w-xs">{admin.email}</p>
-                    {admin.id === userId && (
-                      <p className="text-xs text-stone-400">You</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <select
-                      value={admin.tier}
-                      disabled={tierUpdating === admin.id}
-                      onChange={(e) => handleTierChange(admin.id, Number(e.target.value))}
-                      className="border border-stone-300 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent outline-none disabled:opacity-50"
-                    >
-                      <option value={1}>Tier 1 — Editor</option>
-                      <option value={2}>Tier 2 — Reviewer</option>
-                      <option value={3}>Tier 3 — Super Admin</option>
-                    </select>
-                    {tierUpdating === admin.id && (
-                      <div className="w-4 h-4 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
 
       {/* Change Password */}
       <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">

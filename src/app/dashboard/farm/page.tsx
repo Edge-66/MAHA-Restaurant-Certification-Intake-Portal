@@ -142,7 +142,22 @@ export default async function FarmDashboard() {
               </div>
             )}
           </div>
-          <p className="text-xs text-stone-400 mt-4">
+          {farm.health_practices && farm.health_practices.length > 0 && (
+            <div className="sm:col-span-2 mt-1">
+              <span className="text-stone-500 text-sm block mb-2">Better Health Practices</span>
+              <div className="flex flex-wrap gap-2">
+                {farm.health_practices.map((p: string) => (
+                  <span key={p} className="inline-flex items-center gap-1.5 bg-[#2d6a4f]/8 text-[#2d6a4f] text-xs font-medium px-3 py-1.5 rounded-full border border-[#2d6a4f]/20">
+                    <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-stone-400 mt-4 sm:col-span-2">
             Restaurants list your farm as a supplier on dish submissions. To change your profile, contact MAHA.
           </p>
         </div>

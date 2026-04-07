@@ -11,6 +11,7 @@ export interface Restaurant {
   zip: string;
   participation_level: 'participant' | 'certified';
   description: string | null;
+  health_practices: string[] | null;
   latitude: number | null;
   longitude: number | null;
   created_at: string;
@@ -91,6 +92,7 @@ export interface Farm {
   produce_types: string | null;
   regenerative_practices: string | null;
   certifications: string | null;
+  health_practices: string[] | null;
   hero_image_url: string | null;
   photo_urls: string | null;
   latitude: number | null;

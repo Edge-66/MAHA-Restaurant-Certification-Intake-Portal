@@ -279,6 +279,31 @@ export default function DirectoryClient({ restaurants, farms }: Props) {
       {/* Farms Tab */}
       {activeTab === 'farms' && (
         <>
+          {/* Farm CTA banner */}
+          <div className="bg-[#1b4332] rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 bg-white/10 text-green-200 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+                For Farms & Producers
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-white mb-1">
+                Get your farm in front of verified buyers
+              </h3>
+              <p className="text-sm text-green-200 leading-relaxed max-w-xl">
+                Restaurants using this directory are actively looking for local, verified suppliers.
+                Register your farm to showcase your practices, certifications, and products — and get discovered.
+              </p>
+            </div>
+            <Link
+              href="/apply"
+              className="flex-shrink-0 inline-flex items-center gap-2 bg-white text-[#1b4332] px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-green-50 transition-colors"
+            >
+              Register Your Farm
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </Link>
+          </div>
+
           {filteredFarms.length === 0 ? (
             <EmptyState type="farms" hasSearch={!!searchCenter} />
           ) : (

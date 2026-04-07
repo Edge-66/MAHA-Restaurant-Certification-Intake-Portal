@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
 import type { Farm } from '@/lib/types';
 import { geocodeAddress } from '@/lib/geocode';
-import { notifyFarmDecision } from '@/lib/actions';
+import { notifyFarmDecision, sendPasswordResetForFarm, deleteFarm } from '@/lib/actions';
 
 function parsePhotoUrls(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -33,6 +33,9 @@ export default function AdminFarmDetailPage() {
   const [adminTier, setAdminTier] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [dangerConfirm, setDangerConfirm] = useState<'reset' | 'delete' | null>(null);
+  const [dangerWorking, setDangerWorking] = useState(false);
+  const [dangerMessage, setDangerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [editFields, setEditFields] = useState({
     contact_name: '',
     contact_email: '',
@@ -208,6 +211,32 @@ export default function AdminFarmDetailPage() {
 
     await fetchFarm();
   };
+
+  async function handleFarmPasswordReset() {
+    setDangerWorking(true);
+    setDangerMessage(null);
+    const result = await sendPasswordResetForFarm(id);
+    if (result.error) {
+      setDangerMessage({ type: 'error', text: result.error });
+    } else {
+      setDangerMessage({ type: 'success', text: 'Password reset email sent to the farm owner.' });
+    }
+    setDangerWorking(false);
+    setDangerConfirm(null);
+  }
+
+  async function handleDeleteFarm() {
+    setDangerWorking(true);
+    setDangerMessage(null);
+    const result = await deleteFarm(id);
+    if (result.error) {
+      setDangerMessage({ type: 'error', text: result.error });
+      setDangerWorking(false);
+      setDangerConfirm(null);
+    } else {
+      router.push('/admin/farms');
+    }
+  }
 
   if (loading) {
     return (
@@ -419,7 +448,7 @@ export default function AdminFarmDetailPage() {
       </div>
 
       {/* Status Update */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6">
+      <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold text-stone-900 mb-4">Status & Actions</h2>
         <div className="space-y-4">
           {adminTier >= 2 ? (
@@ -464,6 +493,81 @@ export default function AdminFarmDetailPage() {
           )}
         </div>
       </div>
+      {/* Danger Zone — Tier 3 only */}
+      {adminTier >= 3 && (
+        <div className="bg-white border border-red-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-red-700 mb-1">Danger Zone</h2>
+          <p className="text-sm text-stone-500 mb-5">These actions are permanent and cannot be undone.</p>
+
+          {dangerMessage && (
+            <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
+              dangerMessage.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}>
+              {dangerMessage.text}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {/* Reset Password */}
+            <div className="flex items-center justify-between gap-4 py-3 border-b border-stone-100">
+              <div>
+                <p className="text-sm font-medium text-stone-900">Send Password Reset</p>
+                <p className="text-xs text-stone-500 mt-0.5">Sends a password reset email to the farm owner&apos;s account.</p>
+              </div>
+              {dangerConfirm === 'reset' ? (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-stone-500">Send reset?</span>
+                  <button
+                    onClick={handleFarmPasswordReset}
+                    disabled={dangerWorking}
+                    className="text-xs px-3 py-1.5 bg-[#2d6a4f] text-white rounded-lg hover:bg-[#1b4332] transition-colors disabled:opacity-50"
+                  >
+                    {dangerWorking ? 'Sending…' : 'Send'}
+                  </button>
+                  <button onClick={() => setDangerConfirm(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">Cancel</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDangerConfirm('reset')}
+                  className="flex-shrink-0 text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors"
+                >
+                  Send Reset Email
+                </button>
+              )}
+            </div>
+
+            {/* Delete Farm */}
+            <div className="flex items-center justify-between gap-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-red-700">Delete Farm</p>
+                <p className="text-xs text-stone-500 mt-0.5">Permanently removes this farm and its linked account. This cannot be undone.</p>
+              </div>
+              {dangerConfirm === 'delete' ? (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-stone-500">Are you sure?</span>
+                  <button
+                    onClick={handleDeleteFarm}
+                    disabled={dangerWorking}
+                    className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    {dangerWorking ? 'Deleting…' : 'Delete'}
+                  </button>
+                  <button onClick={() => setDangerConfirm(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">Cancel</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDangerConfirm('delete')}
+                  className="flex-shrink-0 text-xs px-3 py-1.5 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  Delete Farm
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

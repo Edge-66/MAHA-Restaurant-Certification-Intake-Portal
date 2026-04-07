@@ -7,7 +7,7 @@ import StatusBadge from '@/components/StatusBadge';
 import DishCard from '@/components/DishCard';
 import type { SubmissionWithDetails } from '@/lib/types';
 import { geocodeAddress } from '@/lib/geocode';
-import { notifySubmissionDecision } from '@/lib/actions';
+import { notifySubmissionDecision, deleteDish, sendPasswordResetForRestaurant } from '@/lib/actions';
 
 function getSupabase() {
   return createBrowserClient(
@@ -30,6 +30,10 @@ export default function SubmissionDetailPage() {
   const [participationLevel, setParticipationLevel] = useState<'participant' | 'certified'>('participant');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminTier, setAdminTier] = useState(1);
+  const [deletingDish, setDeletingDish] = useState<string | null>(null);
+  const [confirmDeleteDish, setConfirmDeleteDish] = useState<string | null>(null);
+  const [pwResetting, setPwResetting] = useState(false);
+  const [pwResetMsg, setPwResetMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -134,6 +138,31 @@ export default function SubmissionDetailPage() {
     await fetchSubmission();
   };
 
+  async function handleDeleteDish(dishId: string) {
+    setDeletingDish(dishId);
+    const result = await deleteDish(dishId);
+    if (result.error) {
+      alert(result.error);
+    } else {
+      await fetchSubmission();
+    }
+    setDeletingDish(null);
+    setConfirmDeleteDish(null);
+  }
+
+  async function handlePwReset() {
+    if (!submission) return;
+    setPwResetting(true);
+    setPwResetMsg(null);
+    const result = await sendPasswordResetForRestaurant(submission.restaurants.id);
+    if (result.error) {
+      setPwResetMsg({ type: 'error', text: result.error });
+    } else {
+      setPwResetMsg({ type: 'success', text: 'Password reset email sent to the restaurant owner.' });
+    }
+    setPwResetting(false);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -236,6 +265,19 @@ export default function SubmissionDetailPage() {
               <span className="text-stone-900">{restaurant.description}</span>
             </div>
           )}
+          {restaurant.health_practices && restaurant.health_practices.length > 0 && (
+            <div className="sm:col-span-2">
+              <span className="font-medium text-stone-600 block mb-2">Better Health Practices</span>
+              <div className="flex flex-wrap gap-1.5">
+                {restaurant.health_practices.map((p: string) => (
+                  <span key={p} className="inline-flex items-center gap-1 bg-[#2d6a4f]/8 text-[#2d6a4f] text-xs font-medium px-2.5 py-1 rounded-full border border-[#2d6a4f]/20">
+                    <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -316,7 +358,7 @@ export default function SubmissionDetailPage() {
                 );
               })()}
               {adminTier >= 2 && (
-                <div className="flex gap-2 mt-2 ml-1">
+                <div className="flex gap-2 mt-2 ml-1 flex-wrap">
                   {dish.status === 'pending' && (
                     <>
                       <button
@@ -348,6 +390,28 @@ export default function SubmissionDetailPage() {
                     >
                       Approve Instead
                     </button>
+                  )}
+                  {adminTier >= 3 && (
+                    confirmDeleteDish === dish.id ? (
+                      <>
+                        <span className="text-xs text-stone-500 self-center">Delete dish?</span>
+                        <button
+                          onClick={() => handleDeleteDish(dish.id)}
+                          disabled={deletingDish === dish.id}
+                          className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-medium"
+                        >
+                          {deletingDish === dish.id ? '…' : 'Yes, Delete'}
+                        </button>
+                        <button onClick={() => setConfirmDeleteDish(null)} className="text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50">Cancel</button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteDish(dish.id)}
+                        className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition-colors font-medium"
+                      >
+                        Delete Dish
+                      </button>
+                    )
                   )}
                 </div>
               )}
@@ -391,7 +455,7 @@ export default function SubmissionDetailPage() {
       )}
 
       {/* Admin Actions */}
-      <div className="bg-white border border-stone-200 rounded-xl p-6">
+      <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold text-stone-900 mb-4">Admin Actions</h2>
 
         <div className="space-y-4">
@@ -452,6 +516,38 @@ export default function SubmissionDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Danger Zone — Tier 3 only */}
+      {adminTier >= 3 && (
+        <div className="bg-white border border-red-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-red-700 mb-1">Danger Zone</h2>
+          <p className="text-sm text-stone-500 mb-5">Super Admin actions — permanent and cannot be undone.</p>
+
+          {pwResetMsg && (
+            <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
+              pwResetMsg.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}>
+              {pwResetMsg.text}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-4 py-3 border-b border-stone-100">
+            <div>
+              <p className="text-sm font-medium text-stone-900">Send Password Reset</p>
+              <p className="text-xs text-stone-500 mt-0.5">Emails a password reset link to {restaurant.contact_email}.</p>
+            </div>
+            <button
+              onClick={handlePwReset}
+              disabled={pwResetting}
+              className="flex-shrink-0 text-xs px-3 py-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-50"
+            >
+              {pwResetting ? 'Sending…' : 'Send Reset Email'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

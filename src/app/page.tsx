@@ -201,46 +201,54 @@ export default function HomePage() {
       </section>
 
       {/* For Farms */}
-      <section className="py-12 md:py-20 bg-stone-50">
+      <section className="py-12 md:py-20 bg-[#1b4332]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <Reveal>
               <div>
-                <div className="inline-flex items-center gap-2 bg-[#2d6a4f]/10 text-[#2d6a4f] text-xs font-semibold px-3 py-1 rounded-full mb-5">
+                <div className="inline-flex items-center gap-2 bg-white/10 text-green-200 text-xs font-semibold px-3 py-1 rounded-full mb-5">
                   For Farms & Producers
                 </div>
-                <h2 className="text-2xl md:text-3xl font-bold text-stone-900 mb-4">
-                  Get Your Farm on the Map
+                <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+                  Restaurants Are Looking for You
                 </h2>
-                <p className="text-stone-600 leading-relaxed mb-4">
-                  When restaurants list your farm as a supplier on a certified dish, you become
-                  part of the verified network. Register your farm to manage your profile
-                  and connect with restaurants looking for local sourcing partners.
+                <p className="text-green-100 leading-relaxed mb-4">
+                  Every MAHA-certified dish links directly to a verified farm or producer.
+                  Restaurants in our network are actively searching for local suppliers who meet
+                  the program&apos;s standards — get in front of them by registering your farm.
                 </p>
-                <p className="text-stone-600 leading-relaxed mb-8">
-                  We verify farms and producers to ensure the integrity of every certification.
-                  Your certifications, practices, and contact information are available to
-                  restaurants in our network.
+                <p className="text-green-200 leading-relaxed mb-8">
+                  We verify your certifications and practices so restaurants can source from you
+                  with confidence. Your profile, products, and contact info are searchable by
+                  buyers in the directory.
                 </p>
-                <Link
-                  href="/apply"
-                  className="inline-block bg-[#2d6a4f] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#1b4332] transition-colors text-sm"
-                >
-                  Register Your Farm
-                </Link>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <Link
+                    href="/apply"
+                    className="inline-block bg-white text-[#1b4332] px-6 py-3 rounded-xl font-semibold hover:bg-green-50 transition-colors text-sm"
+                  >
+                    Register Your Farm
+                  </Link>
+                  <Link
+                    href="/directory"
+                    className="text-sm text-green-300 hover:text-white font-medium transition-colors"
+                  >
+                    View the Directory →
+                  </Link>
+                </div>
               </div>
             </Reveal>
             <Reveal delay={100}>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: 'Visibility', desc: 'Appear on certified dishes in the public directory' },
-                  { label: 'Credibility', desc: 'Your practices and certifications are verified by MAHA' },
-                  { label: 'Connections', desc: 'Be discovered by restaurants actively seeking local suppliers' },
-                  { label: 'Control', desc: 'Manage your profile and sourcing information directly' },
+                  { label: 'Reach Buyers', desc: 'Restaurants using our directory are actively sourcing — your farm gets found' },
+                  { label: 'Build Credibility', desc: 'MAHA-verified practices carry weight with health-conscious restaurants' },
+                  { label: 'Showcase Standards', desc: 'Display your certifications, welfare practices, and production methods' },
+                  { label: 'Grow Your Network', desc: 'Every certified dish that uses your farm builds your reputation' },
                 ].map((item, i) => (
-                  <div key={i} className="bg-white border border-stone-200 rounded-xl p-5">
-                    <h4 className="text-sm font-semibold text-stone-900 mb-1">{item.label}</h4>
-                    <p className="text-xs text-stone-500 leading-relaxed">{item.desc}</p>
+                  <div key={i} className="bg-white/10 border border-white/10 rounded-xl p-5">
+                    <h4 className="text-sm font-semibold text-white mb-1">{item.label}</h4>
+                    <p className="text-xs text-green-200 leading-relaxed">{item.desc}</p>
                   </div>
                 ))}
               </div>

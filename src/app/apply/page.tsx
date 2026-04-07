@@ -5,6 +5,17 @@ import DishFormSection from '@/components/DishFormSection';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
 import { submitApplication } from '@/lib/actions';
 
+const HEALTH_PRACTICE_OPTIONS = [
+  'Locally sourced ingredients',
+  'No seed oils',
+  'Pasture-raised / grass-fed',
+  'No antibiotics or added hormones',
+  'Non-GMO',
+  'Animal welfare certified',
+  'Whole / minimally processed ingredients',
+  'Regenerative sourced',
+];
+
 const emptyDish: DishFormData = {
   name: '',
   category: '',
@@ -39,6 +50,15 @@ export default function ApplyPage() {
   const [error, setError] = useState('');
   const [stepError, setStepError] = useState('');
 
+  const [healthPractices, setHealthPractices] = useState<string[]>([]);
+  const [otherPractice, setOtherPractice] = useState('');
+
+  function togglePractice(label: string) {
+    setHealthPractices((prev) =>
+      prev.includes(label) ? prev.filter((p) => p !== label) : [...prev, label]
+    );
+  }
+
   const [attestations, setAttestations] = useState({
     accurate: false,
     mainElement: false,
@@ -52,9 +72,10 @@ export default function ApplyPage() {
   function validateStep(s: number): string {
     const form = formRef.current;
     if (!form) return '';
+    const formEl = form;
 
     function val(name: string) {
-      return ((form.elements.namedItem(name) as HTMLInputElement | null)?.value ?? '').trim();
+      return ((formEl.elements.namedItem(name) as HTMLInputElement | null)?.value ?? '').trim();
     }
 
     if (s === 1) {
@@ -122,6 +143,11 @@ export default function ApplyPage() {
     const formData = new FormData(e.currentTarget);
     formData.set('applicant_type', applicantType);
     formData.set('dishes_json', JSON.stringify(dishes));
+    const allPractices = [
+      ...healthPractices,
+      ...(otherPractice.trim() ? [otherPractice.trim()] : []),
+    ];
+    formData.set('health_practices_json', JSON.stringify(allPractices));
 
     try {
       const result = await submitApplication(formData);
@@ -313,54 +339,153 @@ export default function ApplyPage() {
         {/* ── Step 3: Details ───────────────────────────────────────────────── */}
         <div className={step === 3 ? '' : 'hidden'}>
           {applicantType === 'restaurant' ? (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h2 className="text-xl font-semibold text-stone-900">Dish Submissions</h2>
-                  <p className="text-sm text-stone-500 mt-0.5">Add each dish you'd like to certify.</p>
+            <>
+              {/* Dish submissions */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h2 className="text-xl font-semibold text-stone-900">Dish Submissions</h2>
+                    <p className="text-sm text-stone-500 mt-0.5">Add each dish you'd like to certify.</p>
+                  </div>
+                  <button type="button" onClick={addDish} className="flex items-center gap-1.5 text-sm font-medium text-[#2d6a4f] hover:text-[#1b4332]">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    Add Dish
+                  </button>
                 </div>
-                <button type="button" onClick={addDish} className="flex items-center gap-1.5 text-sm font-medium text-[#2d6a4f] hover:text-[#1b4332]">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                  Add Dish
-                </button>
+                <div className="space-y-6">
+                  {dishes.map((dish, i) => (
+                    <DishFormSection
+                      key={i}
+                      index={i}
+                      dish={dish}
+                      onChange={handleDishChange}
+                      onRemove={removeDish}
+                      canRemove={dishes.length > 1}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-6">
-                {dishes.map((dish, i) => (
-                  <DishFormSection
-                    key={i}
-                    index={i}
-                    dish={dish}
-                    onChange={handleDishChange}
-                    onRemove={removeDish}
-                    canRemove={dishes.length > 1}
+
+              {/* Better Health Practices */}
+              <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+                <h2 className="text-xl font-semibold text-stone-900 mb-1">Better Health Practices</h2>
+                <p className="text-sm text-stone-500 mb-5">
+                  Select any practices your restaurant follows that you&apos;d like to showcase. These will appear on your public profile.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                  {HEALTH_PRACTICE_OPTIONS.map((label) => {
+                    const checked = healthPractices.includes(label);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => togglePractice(label)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
+                          checked
+                            ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
+                            : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                        }`}
+                      >
+                        <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                          checked ? 'bg-[#2d6a4f] border-[#2d6a4f]' : 'border-stone-300'
+                        }`}>
+                          {checked && (
+                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Other practices</label>
+                  <input
+                    type="text"
+                    value={otherPractice}
+                    onChange={(e) => setOtherPractice(e.target.value)}
+                    className={inp}
+                    placeholder="e.g. No high-fructose corn syrup, Fermented foods, Organic dairy…"
                   />
-                ))}
+                  <p className="text-xs text-stone-400 mt-1">Optional — describe any additional practices not listed above.</p>
+                </div>
               </div>
-            </div>
+            </>
           ) : (
-            <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
-              <h2 className="text-xl font-semibold text-stone-900 mb-5">Farm Details</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Livestock Types</label>
-                  <input type="text" name="livestock_types" className={inp} placeholder="e.g. Cattle, Poultry, Pigs (comma-separated)" />
-                  <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Produce Types</label>
-                  <input type="text" name="produce_types" className={inp} placeholder="e.g. Vegetables, Herbs, Grains (comma-separated)" />
-                  <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Regenerative / Sustainable Practices</label>
-                  <textarea name="regenerative_practices" rows={3} className={inp} placeholder="e.g. Rotational grazing, Cover cropping, No-till, Composting" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Certifications</label>
-                  <input type="text" name="certifications" className={inp} placeholder="e.g. USDA Organic, Certified Humane, AGA Certified" />
+            <>
+              <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+                <h2 className="text-xl font-semibold text-stone-900 mb-5">Farm Details</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Livestock Types</label>
+                    <input type="text" name="livestock_types" className={inp} placeholder="e.g. Cattle, Poultry, Pigs (comma-separated)" />
+                    <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Produce Types</label>
+                    <input type="text" name="produce_types" className={inp} placeholder="e.g. Vegetables, Herbs, Grains (comma-separated)" />
+                    <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Regenerative / Sustainable Practices</label>
+                    <textarea name="regenerative_practices" rows={3} className={inp} placeholder="e.g. Rotational grazing, Cover cropping, No-till, Composting" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-stone-700 mb-1">Certifications</label>
+                    <input type="text" name="certifications" className={inp} placeholder="e.g. USDA Organic, Certified Humane, AGA Certified" />
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {/* Better Health Practices — farms */}
+              <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
+                <h2 className="text-xl font-semibold text-stone-900 mb-1">Better Health Practices</h2>
+                <p className="text-sm text-stone-500 mb-5">
+                  Select any practices your farm follows. These appear on your public profile and help restaurants find the right supplier.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                  {HEALTH_PRACTICE_OPTIONS.map((label) => {
+                    const checked = healthPractices.includes(label);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => togglePractice(label)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
+                          checked
+                            ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
+                            : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                        }`}
+                      >
+                        <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                          checked ? 'bg-[#2d6a4f] border-[#2d6a4f]' : 'border-stone-300'
+                        }`}>
+                          {checked && (
+                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Other practices</label>
+                  <input
+                    type="text"
+                    value={otherPractice}
+                    onChange={(e) => setOtherPractice(e.target.value)}
+                    className={inp}
+                    placeholder="e.g. Heritage breeds, Biodynamic, Direct-to-consumer…"
+                  />
+                  <p className="text-xs text-stone-400 mt-1">Optional — anything not listed above.</p>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
