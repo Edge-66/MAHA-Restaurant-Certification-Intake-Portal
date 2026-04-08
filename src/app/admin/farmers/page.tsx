@@ -14,6 +14,17 @@ export default async function AdminFarmersPage({
   const params = await searchParams;
   const filterStatus = params.status || 'all';
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase
+        .from('profiles')
+        .select('admin_tier')
+        .eq('id', user.id)
+        .single()
+    : { data: null };
+  const adminTier = profile?.admin_tier ?? 1;
 
   let query = supabase
     .from('farms')
@@ -43,7 +54,17 @@ export default async function AdminFarmersPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-stone-900 mb-2">Farmer admin</h1>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-stone-900">Farmer admin</h1>
+        {adminTier >= 3 && (
+          <Link
+            href="/admin/farmers/new"
+            className="inline-flex items-center justify-center rounded-lg bg-[#2d6a4f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1b4332] transition-colors"
+          >
+            + New farm
+          </Link>
+        )}
+      </div>
       <p className="text-sm text-stone-500 mb-8 max-w-2xl">
         Manage farm profiles, map coordinates, and reviews. For the full historical list with the
         same filters, see{' '}
