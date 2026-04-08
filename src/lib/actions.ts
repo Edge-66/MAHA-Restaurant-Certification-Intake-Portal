@@ -11,6 +11,7 @@ import {
 } from '@/lib/email';
 import { geocodeAddress, geocodeZip } from '@/lib/geocode';
 import { DEFAULT_FARM_HERO_IMAGE } from '@/lib/farmDefaults';
+import { logAdminAction } from '@/lib/adminAudit';
 
 function farmCertRequiresVerifierAck(certType: string | null | undefined): boolean {
   return certType === 'aga' || certType === 'raa' || certType === 'other';
@@ -481,6 +482,12 @@ export async function updateAdminTier(
     .eq('role', 'admin');
 
   if (error) return { error: error.message };
+  await logAdminAction({
+    action: 'admin_tier_updated',
+    target_type: 'profile',
+    target_id: targetId,
+    metadata: { newTier },
+  });
   return {};
 }
 
@@ -541,6 +548,103 @@ export async function updateFarmContact(
     .eq('id', farmId);
 
   if (error) return { error: error.message };
+  return {};
+}
+
+type AdminRestaurantUpdatePayload = {
+  name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  website: string | null;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  description: string | null;
+  participation_level: 'participant' | 'certified';
+  health_practices: string[] | null;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+export async function updateAdminRestaurantProfile(
+  restaurantId: string,
+  payload: AdminRestaurantUpdatePayload
+): Promise<{ error?: string }> {
+  const tierErr = await assertTier2Admin();
+  if (tierErr) return tierErr;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('restaurants')
+    .update({
+      ...payload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', restaurantId);
+
+  if (error) return { error: error.message };
+  await logAdminAction({
+    action: 'restaurant_profile_edited',
+    target_type: 'restaurant',
+    target_id: restaurantId,
+    metadata: {
+      participation_level: payload.participation_level,
+      hasCoordinates: Boolean(payload.latitude && payload.longitude),
+    },
+  });
+  return {};
+}
+
+type AdminFarmUpdatePayload = {
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  website: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  description: string;
+  livestock_types: string;
+  produce_types: string;
+  regenerative_practices: string;
+  certifications: string;
+  farm_practices_other: string;
+};
+
+export async function updateAdminFarmProfile(
+  farmId: string,
+  payload: AdminFarmUpdatePayload
+): Promise<{ error?: string }> {
+  const tierErr = await assertTier2Admin();
+  if (tierErr) return tierErr;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error } = await supabase
+    .from('farms')
+    .update({
+      ...payload,
+      livestock_types: payload.livestock_types ? JSON.stringify(payload.livestock_types.split(',').map((s) => s.trim()).filter(Boolean)) : null,
+      produce_types: payload.produce_types ? JSON.stringify(payload.produce_types.split(',').map((s) => s.trim()).filter(Boolean)) : null,
+      regenerative_practices: payload.regenerative_practices ? JSON.stringify(payload.regenerative_practices.split(',').map((s) => s.trim()).filter(Boolean)) : null,
+      certifications: payload.certifications ? JSON.stringify(payload.certifications.split(',').map((s) => s.trim()).filter(Boolean)) : null,
+      reviewed_by: user?.email ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', farmId);
+
+  if (error) return { error: error.message };
+  await logAdminAction({
+    action: 'farm_profile_edited',
+    target_type: 'farm',
+    target_id: farmId,
+  });
   return {};
 }
 
@@ -623,6 +727,12 @@ export async function submitFarmReviewDecision(
 
   const { error: upErr } = await supabase.from('farms').update(updatePayload).eq('id', farmId);
   if (upErr) return { error: upErr.message };
+  await logAdminAction({
+    action: 'farm_review_decision',
+    target_type: 'farm',
+    target_id: farmId,
+    metadata: { previousStatus: prevStatus, newStatus: decision },
+  });
 
   if (prevStatus !== decision && (decision === 'approved' || decision === 'rejected')) {
     notifyFarmDecision(farmId, decision).catch(() => {});
@@ -749,6 +859,18 @@ export async function backfillMissingFarmCoordinates(options?: {
   const still = new Set<string>();
   for (const r of [...(latNullAfter ?? []), ...(lngNullAfter ?? [])]) still.add(r.id);
 
+  await logAdminAction({
+    action: 'farm_geocode_backfill_run',
+    target_type: 'farm',
+    metadata: {
+      limit,
+      updated,
+      skipped,
+      failed: failed.length,
+      remainingWithoutCoords: still.size,
+    },
+  });
+
   return {
     updated,
     skipped,
@@ -762,6 +884,8 @@ export async function updateSubmissionStatus(
   status: string,
   adminNotes?: string
 ) {
+  const tierErr = await assertTier2Admin();
+  if (tierErr) throw new Error(tierErr.error);
   const supabase = await createClient();
 
   const updateData: Record<string, unknown> = {
@@ -781,9 +905,81 @@ export async function updateSubmissionStatus(
   if (error) {
     throw new Error(`Failed to update submission: ${error.message}`);
   }
+  await logAdminAction({
+    action: 'submission_status_updated',
+    target_type: 'submission',
+    target_id: submissionId,
+    metadata: { status, hasAdminNotes: Boolean(adminNotes?.trim()) },
+  });
+}
+
+export async function reviewSubmissionAdmin(
+  submissionId: string,
+  status: 'pending' | 'approved' | 'rejected' | 'needs_clarification',
+  adminNotes: string,
+  participationLevel: 'participant' | 'certified'
+): Promise<{ error?: string }> {
+  const tierErr = await assertTier2Admin();
+  if (tierErr) return tierErr;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: submission, error: fetchErr } = await supabase
+    .from('submissions')
+    .select('id, status, restaurant_id')
+    .eq('id', submissionId)
+    .single();
+  if (fetchErr || !submission) return { error: 'Submission not found.' };
+
+  const { error: subErr } = await supabase
+    .from('submissions')
+    .update({
+      status,
+      admin_notes: adminNotes,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: user?.email ?? null,
+    })
+    .eq('id', submissionId);
+  if (subErr) return { error: subErr.message };
+
+  await supabase
+    .from('restaurants')
+    .update({ participation_level: participationLevel })
+    .eq('id', submission.restaurant_id);
+
+  if (status === 'approved') {
+    const { data: pendingDishes } = await supabase
+      .from('dishes')
+      .select('id')
+      .eq('submission_id', submissionId)
+      .eq('status', 'pending');
+    for (const dish of pendingDishes ?? []) {
+      await supabase
+        .from('dishes')
+        .update({ status: 'approved', approved_at: new Date().toISOString() })
+        .eq('id', dish.id);
+    }
+  }
+
+  if (status !== submission.status) {
+    notifySubmissionDecision(submissionId, status, adminNotes).catch(() => {});
+  }
+
+  await logAdminAction({
+    action: 'submission_review_updated',
+    target_type: 'submission',
+    target_id: submissionId,
+    metadata: { previousStatus: submission.status, newStatus: status, participationLevel },
+  });
+  return {};
 }
 
 export async function updateDishStatus(dishId: string, status: string) {
+  const tierErr = await assertTier2Admin();
+  if (tierErr) throw new Error(tierErr.error);
   const supabase = await createClient();
 
   const updateData: Record<string, unknown> = { status };
@@ -825,6 +1021,12 @@ export async function updateDishStatus(dishId: string, status: string) {
     .from('restaurants')
     .update({ participation_level: newLevel })
     .eq('id', dish.restaurant_id);
+  await logAdminAction({
+    action: 'dish_status_updated',
+    target_type: 'dish',
+    target_id: dishId,
+    metadata: { status, restaurantId: dish.restaurant_id, participationLevel: newLevel },
+  });
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -933,6 +1135,18 @@ async function assertTier3(): Promise<{ error: string } | null> {
   return null;
 }
 
+async function assertTier2Admin(): Promise<{ error: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+  const { data: profile } = await supabase
+    .from('profiles').select('role, admin_tier').eq('id', user.id).single();
+  if (!profile || profile.role !== 'admin' || (profile.admin_tier ?? 1) < 2) {
+    return { error: 'Reviewer access (Tier 2+) required.' };
+  }
+  return null;
+}
+
 // ─── Password reset ───────────────────────────────────────────────────────────
 
 export async function sendPasswordReset(targetUserId: string): Promise<{ error?: string }> {
@@ -955,6 +1169,12 @@ export async function sendPasswordReset(targetUserId: string): Promise<{ error?:
   }
 
   await sendPasswordResetEmail(userData.user.email, linkData.properties.action_link);
+  await logAdminAction({
+    action: 'password_reset_sent',
+    target_type: 'user',
+    target_id: targetUserId,
+    metadata: { email: userData.user.email },
+  });
   return {};
 }
 
@@ -1016,6 +1236,11 @@ export async function deleteAdminAccount(targetId: string): Promise<{ error?: st
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.deleteUser(targetId);
   if (error) return { error: error.message };
+  await logAdminAction({
+    action: 'admin_account_deleted',
+    target_type: 'user',
+    target_id: targetId,
+  });
   return {};
 }
 
@@ -1038,6 +1263,12 @@ export async function deleteFarm(farmId: string): Promise<{ error?: string }> {
     const admin = createAdminClient();
     await admin.auth.admin.deleteUser(profile.id);
   }
+  await logAdminAction({
+    action: 'farm_deleted',
+    target_type: 'farm',
+    target_id: farmId,
+    metadata: { linkedProfileId: profile?.id ?? null },
+  });
 
   return {};
 }
@@ -1062,6 +1293,12 @@ export async function deleteRestaurantAccount(restaurantId: string): Promise<{ e
     const admin = createAdminClient();
     await admin.auth.admin.deleteUser(profile.id);
   }
+  await logAdminAction({
+    action: 'restaurant_deleted',
+    target_type: 'restaurant',
+    target_id: restaurantId,
+    metadata: { linkedProfileId: profile?.id ?? null },
+  });
 
   return {};
 }
@@ -1087,6 +1324,12 @@ export async function deleteDish(dishId: string): Promise<{ error?: string }> {
     const newLevel = (count ?? 0) >= 7 ? 'certified' : 'participant';
     await supabase.from('restaurants').update({ participation_level: newLevel }).eq('id', dish.restaurant_id);
   }
+  await logAdminAction({
+    action: 'dish_deleted',
+    target_type: 'dish',
+    target_id: dishId,
+    metadata: { restaurantId: dish?.restaurant_id ?? null },
+  });
 
   return {};
 }
@@ -1202,6 +1445,12 @@ export async function updateUserEmail(
   } else if (profile?.role === 'farm' && profile.farm_id) {
     await admin.from('farms').update({ contact_email: newEmail }).eq('id', profile.farm_id);
   }
+  await logAdminAction({
+    action: 'user_email_updated',
+    target_type: 'user',
+    target_id: userId,
+    metadata: { newEmail },
+  });
 
   return {};
 }

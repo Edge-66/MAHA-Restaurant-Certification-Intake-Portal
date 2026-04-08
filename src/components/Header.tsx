@@ -21,6 +21,8 @@ export default function Header() {
   const [open, setOpen] = useState(false);
   const [dashboardHref, setDashboardHref] = useState<string | null>(null);
   const [accountHref, setAccountHref] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminTier, setAdminTier] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -41,12 +43,17 @@ export default function Header() {
       if (profileRole === 'restaurant') {
         setDashboardHref('/dashboard/restaurant');
         setAccountHref('/dashboard/account');
+        setIsAdmin(false);
+        setAdminTier(0);
       } else if (profileRole === 'farm') {
         setDashboardHref('/dashboard/farm');
         setAccountHref('/dashboard/account');
+        setIsAdmin(false);
+        setAdminTier(0);
       } else {
         setDashboardHref('/admin/review-queue');
         setAccountHref('/admin/account');
+        setIsAdmin(true);
       }
     }
 
@@ -54,24 +61,30 @@ export default function Header() {
       if (!session) {
         setDashboardHref(null);
         setAccountHref(null);
+        setIsAdmin(false);
+        setAdminTier(0);
         return;
       }
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, admin_tier')
         .eq('id', session.user.id)
         .single();
       setDashboardForRole(profile?.role);
+      setAdminTier(profile?.admin_tier ?? 0);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         setDashboardHref(null);
         setAccountHref(null);
+        setIsAdmin(false);
+        setAdminTier(0);
         return;
       }
-      supabase.from('profiles').select('role').eq('id', session.user.id).single().then(({ data: profile }) => {
+      supabase.from('profiles').select('role, admin_tier').eq('id', session.user.id).single().then(({ data: profile }) => {
         setDashboardForRole(profile?.role);
+        setAdminTier(profile?.admin_tier ?? 0);
       });
     });
     return () => subscription.unsubscribe();
@@ -148,6 +161,26 @@ export default function Header() {
                   >
                     {dashboardHref ? 'Dashboard' : 'Sign In'}
                   </Link>
+                  {isAdmin && (
+                    <>
+                      <Link
+                        href="/admin/submissions"
+                        className={menuItemClass('/admin/submissions')}
+                        onClick={() => setOpen(false)}
+                      >
+                        All applications
+                      </Link>
+                      {adminTier >= 3 && (
+                        <Link
+                          href="/admin/logs"
+                          className={menuItemClass('/admin/logs')}
+                          onClick={() => setOpen(false)}
+                        >
+                          Logs
+                        </Link>
+                      )}
+                    </>
+                  )}
                   {accountHref && (
                     <>
                       <div className="my-2 border-t border-stone-100" />

@@ -55,7 +55,7 @@ export default async function AdminFarmersPage({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-stone-900">Farmer admin</h1>
+        <h1 className="text-2xl font-bold text-stone-900">Farms</h1>
         {adminTier >= 3 && (
           <Link
             href="/admin/farmers/new"

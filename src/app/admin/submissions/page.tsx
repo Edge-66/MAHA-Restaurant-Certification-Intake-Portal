@@ -162,9 +162,9 @@ export default async function SubmissionsPage({
           <div className="mb-6 rounded-xl border border-[#2d6a4f]/20 bg-[#2d6a4f]/5 px-4 py-4 text-sm">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <p className="font-medium text-stone-900">Farmer admin & map coordinates</p>
+                <p className="font-medium text-stone-900">Farms & map coordinates</p>
                 <p className="text-stone-600 mt-0.5 max-w-xl">
-                  Farmer admin has the directory geocoder, filters, and links to manage each farm profile and review queue.
+                  Farms has the directory geocoder, filters, and links to manage each farm profile and review queue.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 shrink-0">
@@ -172,7 +172,7 @@ export default async function SubmissionsPage({
                   href="/admin/farmers"
                   className="inline-flex items-center justify-center rounded-lg bg-[#2d6a4f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1b4332] transition-colors"
                 >
-                  Open farmer admin
+                  Open farms
                 </Link>
                 <Link
                   href="/admin/farms/pending"

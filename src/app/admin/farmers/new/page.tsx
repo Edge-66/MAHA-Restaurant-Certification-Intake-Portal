@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { DEFAULT_FARM_HERO_IMAGE } from '@/lib/farmDefaults';
 import { US_STATES } from '@/lib/types';
+import { logAdminAction } from '@/lib/adminAudit';
 
 function csvToJsonArray(raw: FormDataEntryValue | null): string | null {
   const text = String(raw ?? '').trim();
@@ -73,6 +74,13 @@ async function createFarm(formData: FormData) {
     redirect('/admin/farmers/new?error=save');
   }
 
+  await logAdminAction({
+    action: 'farm_created_manual',
+    target_type: 'farm',
+    target_id: farm.id,
+    metadata: { status },
+  });
+
   redirect(`/admin/farms/${farm.id}`);
 }
 
@@ -102,7 +110,7 @@ export default async function NewFarmAdminPage({
   return (
     <div className="max-w-3xl">
       <Link href="/admin/farmers" className="text-sm text-[#2d6a4f] hover:underline font-medium">
-        ← Farmer admin
+        ← Farms
       </Link>
 
       <h1 className="text-2xl font-bold text-stone-900 mt-4 mb-6">Create new farm</h1>

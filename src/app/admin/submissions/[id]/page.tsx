@@ -6,8 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
 import DishCard from '@/components/DishCard';
 import type { SubmissionWithDetails } from '@/lib/types';
-import { geocodeAddress } from '@/lib/geocode';
-import { notifySubmissionDecision, deleteDish, sendPasswordResetForRestaurant } from '@/lib/actions';
+import { deleteDish, reviewSubmissionAdmin, sendPasswordResetForRestaurant, updateDishStatus } from '@/lib/actions';
 
 function getSupabase() {
   return createBrowserClient(
@@ -75,53 +74,19 @@ export default function SubmissionDetailPage() {
 
   const handleUpdateStatus = async () => {
     setSaving(true);
-    const supabase = getSupabase();
-
-    const updateData: Record<string, unknown> = {
-      status: selectedStatus,
-      admin_notes: adminNotes,
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: adminEmail || null,
-    };
-
-    await supabase.from('submissions').update(updateData).eq('id', id);
-
-    if (submission?.restaurants?.id) {
-      await supabase
-        .from('restaurants')
-        .update({ participation_level: participationLevel })
-        .eq('id', submission.restaurants.id);
-    }
-
-    // If approving submission, approve all pending dishes + geocode restaurant
-    if (selectedStatus === 'approved' && submission) {
-      const pendingDishes = submission.dishes.filter((d) => d.status === 'pending');
-      for (const dish of pendingDishes) {
-        await supabase
-          .from('dishes')
-          .update({ status: 'approved', approved_at: new Date().toISOString() })
-          .eq('id', dish.id);
-      }
-
-      // Auto-geocode restaurant address for map
-      const r = submission.restaurants;
-      if (r && !r.latitude) {
-        const geo = await geocodeAddress(r.address, r.city, r.state, r.zip);
-        if (geo) {
-          await supabase.from('restaurants').update({
-            latitude: geo.latitude,
-            longitude: geo.longitude,
-          }).eq('id', r.id);
-        }
-      }
+    const res = await reviewSubmissionAdmin(
+      id,
+      selectedStatus as 'pending' | 'approved' | 'rejected' | 'needs_clarification',
+      adminNotes,
+      participationLevel
+    );
+    if (res.error) {
+      alert(res.error);
+      setSaving(false);
+      return;
     }
 
     await fetchSubmission();
-
-    // Email + in-app notification when status changes
-    if (selectedStatus !== submission?.status) {
-      notifySubmissionDecision(id, selectedStatus, adminNotes).catch(() => {});
-    }
 
     setSaving(false);
     setSaved(true);
@@ -129,12 +94,7 @@ export default function SubmissionDetailPage() {
   };
 
   const handleDishAction = async (dishId: string, status: 'approved' | 'rejected') => {
-    const supabase = getSupabase();
-    const updateData: Record<string, unknown> = { status };
-    if (status === 'approved') {
-      updateData.approved_at = new Date().toISOString();
-    }
-    await supabase.from('dishes').update(updateData).eq('id', dishId);
+    await updateDishStatus(dishId, status);
     await fetchSubmission();
   };
 

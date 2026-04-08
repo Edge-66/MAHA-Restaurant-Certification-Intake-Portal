@@ -1,13 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import type { Restaurant } from '@/lib/types';
 import { US_STATES } from '@/lib/types';
 import { geocodeAddress } from '@/lib/geocode';
-import { sendPasswordResetForRestaurant } from '@/lib/actions';
+import { sendPasswordResetForRestaurant, updateAdminRestaurantProfile } from '@/lib/actions';
 
 function getSupabase() {
   return createBrowserClient(
@@ -18,6 +17,7 @@ function getSupabase() {
 
 export default function AdminRestaurantDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -42,6 +42,7 @@ export default function AdminRestaurantDetailPage() {
   const [healthPracticesText, setHealthPracticesText] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [baseSnapshot, setBaseSnapshot] = useState<string>('');
 
   const load = useCallback(async () => {
     const supabase = getSupabase();
@@ -63,6 +64,24 @@ export default function AdminRestaurantDetailPage() {
       setHealthPracticesText((r.health_practices ?? []).join(', '));
       setLatitude(r.latitude != null ? String(r.latitude) : '');
       setLongitude(r.longitude != null ? String(r.longitude) : '');
+      setBaseSnapshot(
+        JSON.stringify({
+          name: r.name,
+          contactName: r.contact_name,
+          contactEmail: r.contact_email,
+          contactPhone: r.contact_phone,
+          website: r.website ?? '',
+          address: r.address,
+          city: r.city,
+          state: r.state,
+          zip: r.zip,
+          description: r.description ?? '',
+          participationLevel: r.participation_level === 'certified' ? 'certified' : 'participant',
+          healthPracticesText: (r.health_practices ?? []).join(', '),
+          latitude: r.latitude != null ? String(r.latitude) : '',
+          longitude: r.longitude != null ? String(r.longitude) : '',
+        })
+      );
     }
     setLoading(false);
   }, [id]);
@@ -71,9 +90,60 @@ export default function AdminRestaurantDetailPage() {
     void load();
   }, [load]);
 
+  const hasUnsavedChanges = useMemo(() => {
+    if (!baseSnapshot) return false;
+    const current = JSON.stringify({
+      name,
+      contactName,
+      contactEmail,
+      contactPhone,
+      website,
+      address,
+      city,
+      state,
+      zip,
+      description,
+      participationLevel,
+      healthPracticesText,
+      latitude,
+      longitude,
+    });
+    return current !== baseSnapshot;
+  }, [
+    address,
+    baseSnapshot,
+    city,
+    contactEmail,
+    contactName,
+    contactPhone,
+    description,
+    healthPracticesText,
+    latitude,
+    longitude,
+    name,
+    participationLevel,
+    state,
+    website,
+    zip,
+  ]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  function confirmDiscardAndGo(path: string) {
+    if (hasUnsavedChanges && !window.confirm('You have unsaved changes. Discard them and leave this page?')) return;
+    router.push(path);
+  }
+
   async function handleSave() {
     setSaving(true);
-    const supabase = getSupabase();
     const practices = healthPracticesText
       .split(/[\n,]+/)
       .map((s) => s.trim())
@@ -82,30 +152,25 @@ export default function AdminRestaurantDetailPage() {
     const lat = latitude.trim() === '' ? null : parseFloat(latitude);
     const lng = longitude.trim() === '' ? null : parseFloat(longitude);
 
-    const { error } = await supabase
-      .from('restaurants')
-      .update({
-        name: name.trim(),
-        contact_name: contactName.trim(),
-        contact_email: contactEmail.trim(),
-        contact_phone: contactPhone.trim(),
-        website: website.trim() || null,
-        address: address.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        zip: zip.trim(),
-        description: description.trim() || null,
-        participation_level: participationLevel,
-        health_practices: practices.length > 0 ? practices : null,
-        latitude: lat != null && !Number.isNaN(lat) ? lat : null,
-        longitude: lng != null && !Number.isNaN(lng) ? lng : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-
+    const res = await updateAdminRestaurantProfile(id, {
+      name: name.trim(),
+      contact_name: contactName.trim(),
+      contact_email: contactEmail.trim(),
+      contact_phone: contactPhone.trim(),
+      website: website.trim() || null,
+      address: address.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      zip: zip.trim(),
+      description: description.trim() || null,
+      participation_level: participationLevel,
+      health_practices: practices.length > 0 ? practices : null,
+      latitude: lat != null && !Number.isNaN(lat) ? lat : null,
+      longitude: lng != null && !Number.isNaN(lng) ? lng : null,
+    });
     setSaving(false);
-    if (error) {
-      alert(error.message);
+    if (res.error) {
+      alert(res.error);
       return;
     }
     setSaved(true);
@@ -145,9 +210,13 @@ export default function AdminRestaurantDetailPage() {
     return (
       <div>
         <p className="text-stone-600 text-sm">Restaurant not found.</p>
-        <Link href="/admin/restaurants" className="text-[#2d6a4f] text-sm font-medium mt-2 inline-block hover:underline">
-          ← Restaurant admin
-        </Link>
+        <button
+          type="button"
+          onClick={() => confirmDiscardAndGo('/admin/restaurants')}
+          className="text-[#2d6a4f] text-sm font-medium mt-2 inline-block hover:underline"
+        >
+          ← Restaurants
+        </button>
       </div>
     );
   }
@@ -155,9 +224,13 @@ export default function AdminRestaurantDetailPage() {
   return (
     <div className="max-w-3xl">
       <div className="mb-6">
-        <Link href="/admin/restaurants" className="text-sm text-[#2d6a4f] hover:underline font-medium">
-          ← All restaurants
-        </Link>
+        <button
+          type="button"
+          onClick={() => confirmDiscardAndGo('/admin/restaurants')}
+          className="text-sm text-[#2d6a4f] hover:underline font-medium"
+        >
+          ← Restaurants
+        </button>
       </div>
 
       <h1 className="text-2xl font-bold text-stone-900 mb-6">Edit restaurant</h1>

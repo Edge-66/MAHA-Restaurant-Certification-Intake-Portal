@@ -67,19 +67,6 @@ function IconFarmer({ className = 'w-5 h-5 shrink-0' }: { className?: string }) 
   );
 }
 
-/** Archive / ledger — canonical application archive */
-function IconArchive({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
-      />
-    </svg>
-  );
-}
-
 /** Minimal list lines — stays crisp at 16px (no tall pin stem) */
 function IconGlobe({ className = 'w-4 h-4 shrink-0' }: { className?: string }) {
   return (
@@ -99,17 +86,11 @@ function IconBook({ className = 'w-4 h-4 shrink-0' }: { className?: string }) {
 }
 
 const navItems: NavItem[] = [
-  { href: '/admin/review-queue', label: 'Review queue', icon: <IconInbox /> },
   { href: '/admin', label: 'Dashboard', icon: <IconDashboard /> },
-  { href: '/admin/restaurants', label: 'Restaurant admin', icon: <IconRestaurant /> },
-  { href: '/admin/farmers', label: 'Farmer admin', icon: <IconFarmer /> },
+  { href: '/admin/review-queue', label: 'Review Queue', icon: <IconInbox /> },
+  { href: '/admin/restaurants', label: 'Restaurants', icon: <IconRestaurant /> },
+  { href: '/admin/farmers', label: 'Farms', icon: <IconFarmer /> },
 ];
-
-const archiveNavItem: NavItem = {
-  href: '/admin/submissions',
-  label: 'All applications',
-  icon: <IconArchive />,
-};
 
 const tier3Items: NavItem[] = [
   { href: '/admin/permissions', label: 'Permissions', icon: <IconShield /> },
@@ -160,9 +141,6 @@ export default function AdminSidebar({ adminTier = 1 }: { adminTier?: number }) 
     }
     if (href === '/admin/farmers') {
       return pathname === '/admin/farmers' || pathname.startsWith('/admin/farms');
-    }
-    if (href === '/admin/submissions') {
-      return pathname.startsWith('/admin/submissions');
     }
     return pathname.startsWith(href);
   }
@@ -240,21 +218,6 @@ export default function AdminSidebar({ adminTier = 1 }: { adminTier?: number }) 
             </li>
           ))}
         </ul>
-
-        <div className={`mt-4 pt-4 border-t border-[#2d6a4f] ${collapsed ? 'md:mt-3 md:pt-3' : ''}`}>
-          <ul className="flex md:flex-col gap-1 md:space-y-1">
-            <li className="flex-shrink-0">
-              <Link
-                href={archiveNavItem.href}
-                className={linkClass(archiveNavItem.href)}
-                title={archiveNavItem.label}
-              >
-                {archiveNavItem.icon}
-                <span className={collapsed ? 'md:hidden' : ''}>{archiveNavItem.label}</span>
-              </Link>
-            </li>
-          </ul>
-        </div>
 
         {adminTier >= 3 && (
           <div className={`hidden md:block mt-6 ${collapsed ? 'md:mt-4' : ''}`}>

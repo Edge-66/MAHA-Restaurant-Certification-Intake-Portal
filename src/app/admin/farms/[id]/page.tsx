@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -8,8 +8,8 @@ import StatusBadge from '@/components/StatusBadge';
 import FarmReviewActions from '@/components/FarmReviewActions';
 import { useImageCropper } from '@/components/ImageCropper';
 import type { Farm } from '@/lib/types';
-import { sendPasswordResetForFarm, deleteFarm } from '@/lib/actions';
-import { parseFarmTagField, serializeFarmTagsFromText } from '@/lib/farmTags';
+import { sendPasswordResetForFarm, deleteFarm, updateAdminFarmProfile } from '@/lib/actions';
+import { parseFarmTagField } from '@/lib/farmTags';
 import { DEFAULT_FARM_HERO_IMAGE } from '@/lib/farmDefaults';
 
 function parsePhotoUrls(raw: string | null | undefined): string[] {
@@ -39,6 +39,7 @@ export default function AdminFarmDetailPage() {
   const [dangerConfirm, setDangerConfirm] = useState<'reset' | 'delete' | null>(null);
   const [dangerWorking, setDangerWorking] = useState(false);
   const [dangerMessage, setDangerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [baseSnapshot, setBaseSnapshot] = useState('');
   const { requestCrop, cropperModal } = useImageCropper();
   const [editFields, setEditFields] = useState({
     contact_name: '',
@@ -81,7 +82,7 @@ export default function AdminFarmDetailPage() {
 
     if (data) {
       setFarm(data as Farm);
-      setEditFields({
+      const nextFields = {
         contact_name: data.contact_name || '',
         contact_email: data.contact_email || '',
         contact_phone: data.contact_phone || '',
@@ -96,7 +97,9 @@ export default function AdminFarmDetailPage() {
         regenerative_practices: parseFarmTagField(data.regenerative_practices).join(', '),
         certifications: parseFarmTagField(data.certifications).join(', '),
         farm_practices_other: (data as Farm).farm_practices_other?.trim() ?? '',
-      });
+      };
+      setEditFields(nextFields);
+      setBaseSnapshot(JSON.stringify(nextFields));
     }
     setLoading(false);
   }, [id]);
@@ -105,30 +108,34 @@ export default function AdminFarmDetailPage() {
     fetchFarm();
   }, [fetchFarm]);
 
+  const hasUnsavedChanges = useMemo(
+    () => (baseSnapshot ? JSON.stringify(editFields) !== baseSnapshot : false),
+    [baseSnapshot, editFields]
+  );
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const confirmDiscardAndGo = (path: string) => {
+    if (hasUnsavedChanges && !window.confirm('You have unsaved changes. Discard them and leave this page?')) return;
+    router.push(path);
+  };
+
   const handleSaveProfile = async () => {
     setSaving(true);
-    const supabase = getSupabase();
-    const {
-      livestock_types,
-      produce_types,
-      regenerative_practices,
-      certifications,
-      farm_practices_other,
-      ...profileRest
-    } = editFields;
-    await supabase
-      .from('farms')
-      .update({
-        ...profileRest,
-        livestock_types: serializeFarmTagsFromText(livestock_types),
-        produce_types: serializeFarmTagsFromText(produce_types),
-        regenerative_practices: serializeFarmTagsFromText(regenerative_practices),
-        certifications: serializeFarmTagsFromText(certifications),
-        farm_practices_other: farm_practices_other.trim() || null,
-        updated_at: new Date().toISOString(),
-        reviewed_by: adminEmail || null,
-      })
-      .eq('id', id);
+    const res = await updateAdminFarmProfile(id, editFields);
+    if (res.error) {
+      alert(res.error);
+      setSaving(false);
+      return;
+    }
     await fetchFarm();
     setSaving(false);
     setSaved(true);
@@ -139,6 +146,7 @@ export default function AdminFarmDetailPage() {
     const selected = e.target.files?.[0];
     e.target.value = '';
     if (!selected) return;
+    if (!window.confirm('Upload this hero image now? This change will be saved immediately.')) return;
     const file = selected.type.startsWith('image/') ? await requestCrop(selected, { aspect: 16 / 9 }) : selected;
     if (!file) return;
     setUploading(true);
@@ -166,6 +174,7 @@ export default function AdminFarmDetailPage() {
     const files = e.target.files;
     e.target.value = '';
     if (!files || files.length === 0) return;
+    if (!window.confirm('Add these photos now? This change will be saved immediately.')) return;
     setUploading(true);
 
     const supabase = getSupabase();
@@ -198,6 +207,7 @@ export default function AdminFarmDetailPage() {
   };
 
   const removeGalleryPhoto = async (urlToRemove: string) => {
+    if (!window.confirm('Remove this gallery photo now? This change will be saved immediately.')) return;
     const supabase = getSupabase();
     const currentPhotos: string[] = parsePhotoUrls(farm?.photo_urls);
     const updated = currentPhotos.filter((u) => u !== urlToRemove);
@@ -249,7 +259,7 @@ export default function AdminFarmDetailPage() {
       <div className="text-center py-20 text-stone-500">
         Farm not found.
         <button onClick={() => router.push('/admin/farmers')} className="block mx-auto mt-4 text-[#2d6a4f] hover:underline">
-          ← Back to farmer admin
+          ← Back to farms
         </button>
       </div>
     );
@@ -267,10 +277,10 @@ export default function AdminFarmDetailPage() {
         </div>
       )}
       <button
-        onClick={() => router.push('/admin/farmers')}
+        onClick={() => confirmDiscardAndGo('/admin/farmers')}
         className="text-sm text-[#2d6a4f] hover:underline mb-6 inline-block"
       >
-        ← Back to farmer admin
+        ← Back to farms
       </button>
 
       {farm.status === 'pending' && (
@@ -428,7 +438,7 @@ export default function AdminFarmDetailPage() {
         <h2 className="text-lg font-semibold text-stone-900 mb-4">Hero Image</h2>
         <p className="text-xs text-stone-500 mb-4">This is the main banner image shown on the farm&apos;s profile page.</p>
         <div className="mb-4">
-          <img src={heroImageUrl} alt="Hero" className="w-full h-48 object-cover rounded-lg" />
+          <img src={heroImageUrl} alt="Hero" className="w-full h-48 object-contain bg-stone-100 rounded-lg" />
         </div>
         <label className="inline-block bg-white border border-stone-300 rounded-lg px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 cursor-pointer transition-colors">
           {uploading ? 'Uploading...' : 'Upload Hero Image'}
@@ -444,7 +454,7 @@ export default function AdminFarmDetailPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
             {galleryPhotos.map((url, i) => (
               <div key={i} className="relative group">
-                <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-32 object-cover rounded-lg" />
+                <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-32 object-contain bg-stone-100 rounded-lg" />
                 <button
                   onClick={() => removeGalleryPhoto(url)}
                   className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
@@ -490,10 +500,10 @@ export default function AdminFarmDetailPage() {
             disabled={saving}
             className="bg-white border border-stone-300 text-stone-800 px-6 py-2.5 rounded-lg font-medium hover:bg-stone-50 transition-colors disabled:opacity-50"
           >
-            {saving ? 'Saving…' : 'Save profile & farm details only'}
+            {saving ? 'Saving…' : 'Save changes'}
           </button>
           <p className="text-xs text-stone-400 mt-2">
-            Saves contact info, description, and types below without changing listing status.
+            Saves contact info and farm details below without changing listing status.
           </p>
         </div>
         {farm.reviewed_by && farm.updated_at && (

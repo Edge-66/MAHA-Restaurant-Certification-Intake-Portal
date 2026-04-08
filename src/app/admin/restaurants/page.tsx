@@ -13,7 +13,7 @@ export default async function AdminRestaurantsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-stone-900 mb-2">Restaurant admin</h1>
+      <h1 className="text-2xl font-bold text-stone-900 mb-2">Restaurants</h1>
       <p className="text-sm text-stone-500 mb-8 max-w-2xl">
         Edit restaurant profiles, participation level, health practices, and map coordinates. Submission and
         dish review workflows stay under{' '}
