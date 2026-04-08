@@ -99,7 +99,7 @@ const tier3Items: NavItem[] = [
 
 const publicItems: NavItem[] = [
   { href: '/directory', label: 'Directory', icon: <IconGlobe /> },
-  { href: '/about-certification', label: 'How It Works', icon: <IconBook /> },
+  { href: '/about-certification', label: 'How it Works', icon: <IconBook /> },
 ];
 
 export default function AdminSidebar({ adminTier = 1 }: { adminTier?: number }) {

@@ -37,7 +37,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/about-certification" className="text-sm text-green-200/80 hover:text-white transition-colors">
-                  How It Works
+                  How it Works
                 </Link>
               </li>
             </ul>

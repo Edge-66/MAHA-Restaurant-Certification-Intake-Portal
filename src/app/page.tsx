@@ -232,7 +232,7 @@ export default async function HomePage() {
                 <div className="flex items-center gap-4 flex-wrap">
                   {showApplyCtas && (
                     <Link
-                      href="/apply"
+                      href="/apply?type=farm"
                       className="inline-block bg-white text-[#1b4332] px-6 py-3 rounded-xl font-semibold hover:bg-green-50 transition-colors text-sm"
                     >
                       Register Your Farm

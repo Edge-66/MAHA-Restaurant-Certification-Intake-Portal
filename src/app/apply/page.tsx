@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import DishFormSection from '@/components/DishFormSection';
 import { useImageCropper } from '@/components/ImageCropper';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
@@ -48,6 +49,7 @@ const STEPS = [
 ];
 
 export default function ApplyPage() {
+  const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(0);
   const [applicantType, setApplicantType] = useState<'restaurant' | 'farm'>('restaurant');
@@ -71,6 +73,13 @@ export default function ApplyPage() {
   const [farmProduce, setFarmProduce] = useState<string[]>([]);
   const [farmRegenerative, setFarmRegenerative] = useState<string[]>([]);
   const [farmPracticesOther, setFarmPracticesOther] = useState('');
+
+  useEffect(() => {
+    const type = searchParams.get('type');
+    if (type === 'farm') {
+      setApplicantType('farm');
+    }
+  }, [searchParams]);
 
   function toggleFarmTag(
     selected: string[],

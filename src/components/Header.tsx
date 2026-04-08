@@ -14,7 +14,7 @@ const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400' });
 
 const BASE_NAV = [
   { label: 'Directory', href: '/directory' },
-  { label: 'How It Works', href: '/about-certification' },
+  { label: 'How it Works', href: '/about-certification' },
 ] as const;
 
 export default function Header() {

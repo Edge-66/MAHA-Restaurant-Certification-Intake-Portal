@@ -295,7 +295,7 @@ export default function DirectoryClient({ restaurants, farms }: Props) {
               </p>
             </div>
             <Link
-              href="/apply"
+              href="/apply?type=farm"
               className="flex-shrink-0 inline-flex items-center gap-2 bg-white text-[#1b4332] px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-green-50 transition-colors"
             >
               Register Your Farm
@@ -389,7 +389,7 @@ function EmptyState({ type, hasSearch }: { type: 'restaurants' | 'farms'; hasSea
       </p>
       {!hasSearch && (
         <Link
-          href="/apply"
+          href={type === 'farms' ? '/apply?type=farm' : '/apply'}
           className="inline-block bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#1b4332] transition-colors"
         >
           Apply Now
