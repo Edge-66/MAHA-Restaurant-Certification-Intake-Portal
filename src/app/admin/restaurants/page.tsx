@@ -9,7 +9,24 @@ export default async function AdminRestaurantsPage() {
     .select('id, name, city, state, participation_level, contact_email, created_at')
     .order('name', { ascending: true });
 
+  const { data: submissions } = await supabase
+    .from('submissions')
+    .select('restaurant_id, status, reviewed_at, submitted_at');
+
   const rows = restaurants ?? [];
+  const latestStatusByRestaurant = new Map<string, string>();
+  const latestTimestampByRestaurant = new Map<string, number>();
+
+  for (const submission of submissions ?? []) {
+    const restaurantId = submission.restaurant_id;
+    if (!restaurantId) continue;
+    const ts = Date.parse(submission.reviewed_at ?? submission.submitted_at ?? '');
+    const prevTs = latestTimestampByRestaurant.get(restaurantId) ?? Number.NEGATIVE_INFINITY;
+    if (ts >= prevTs) {
+      latestTimestampByRestaurant.set(restaurantId, ts);
+      latestStatusByRestaurant.set(restaurantId, submission.status ?? 'pending');
+    }
+  }
 
   return (
     <div>
@@ -46,15 +63,47 @@ export default async function AdminRestaurantsPage() {
                       {r.city}, {r.state}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${
-                          r.participation_level === 'certified'
-                            ? 'bg-[#2d6a4f] text-white'
-                            : 'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        {r.participation_level === 'certified' ? 'Certified' : 'Participant'}
-                      </span>
+                      {(() => {
+                        const latestStatus = latestStatusByRestaurant.get(r.id);
+                        if (!latestStatus) {
+                          return (
+                            <span
+                              className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                r.participation_level === 'certified'
+                                  ? 'bg-[#2d6a4f] text-white'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {r.participation_level === 'certified' ? 'Certified' : 'Participant'}
+                            </span>
+                          );
+                        }
+                        if (latestStatus === 'approved') {
+                          return (
+                            <span
+                              className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                r.participation_level === 'certified'
+                                  ? 'bg-[#2d6a4f] text-white'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {r.participation_level === 'certified' ? 'Certified' : 'Participant'}
+                            </span>
+                          );
+                        }
+                        if (latestStatus === 'rejected') {
+                          return (
+                            <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-800">
+                              Rejected
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">
+                            Pending
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-stone-500 text-xs hidden sm:table-cell truncate max-w-[200px]">
                       {r.contact_email}
