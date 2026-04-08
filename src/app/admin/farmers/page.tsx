@@ -111,7 +111,18 @@ export default async function AdminFarmersPage({
             <tbody className="divide-y divide-stone-100">
               {allFarms.map((farm) => (
                 <tr key={farm.id} className="hover:bg-stone-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-stone-900">{farm.name}</td>
+                  <td className="px-6 py-4 font-medium text-stone-900">
+                    <Link
+                      href={
+                        farm.status === 'pending'
+                          ? `/admin/farms/${farm.id}/review`
+                          : `/admin/farms/${farm.id}`
+                      }
+                      className="hover:underline"
+                    >
+                      {farm.name}
+                    </Link>
+                  </td>
                   <td className="px-6 py-4 text-stone-500">
                     {farm.city}, {farm.state}
                   </td>

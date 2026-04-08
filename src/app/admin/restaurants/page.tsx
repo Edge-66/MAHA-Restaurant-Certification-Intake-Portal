@@ -58,7 +58,11 @@ export default async function AdminRestaurantsPage() {
               <tbody className="divide-y divide-stone-100">
                 {rows.map((r) => (
                   <tr key={r.id} className="hover:bg-stone-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-stone-900">{r.name}</td>
+                    <td className="px-6 py-4 font-medium text-stone-900">
+                      <Link href={`/admin/restaurants/${r.id}`} className="hover:underline">
+                        {r.name}
+                      </Link>
+                    </td>
                     <td className="px-6 py-4 text-stone-500 hidden md:table-cell">
                       {r.city}, {r.state}
                     </td>
