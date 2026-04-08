@@ -8,8 +8,8 @@ export default function AdminError({ reset }: { error: Error & { digest?: string
       heading="Admin page error"
       message="Something went wrong loading this page. Try again or return to the admin dashboard."
       reset={reset}
-      homeHref="/admin"
-      homeLabel="Admin Dashboard"
+      homeHref="/admin/review-queue"
+      homeLabel="Review queue"
     />
   );
 }

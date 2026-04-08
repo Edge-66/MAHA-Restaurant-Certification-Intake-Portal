@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { parseFarmTagField } from '@/lib/farmTags';
 
 export default async function FarmDashboard() {
   const supabase = await createClient();
@@ -25,6 +26,12 @@ export default async function FarmDashboard() {
     .single();
 
   if (!farm) redirect('/login');
+
+  const livestockTags = parseFarmTagField(farm.livestock_types);
+  const produceTags = parseFarmTagField(farm.produce_types);
+  const regenerativeTags = parseFarmTagField(farm.regenerative_practices);
+  const certTags = parseFarmTagField(farm.certifications);
+  const practicesOther = (farm.farm_practices_other ?? '').trim();
 
   const statusLabel =
     farm.status === 'approved'
@@ -111,28 +118,70 @@ export default async function FarmDashboard() {
                 </span>
               </div>
             )}
-            {farm.livestock_types && (
+            {livestockTags.length > 0 && (
               <div className="sm:col-span-2">
-                <span className="text-stone-500">Livestock:</span>{' '}
-                <span className="text-stone-900">{farm.livestock_types}</span>
+                <span className="text-stone-500 text-sm block mb-2">Livestock</span>
+                <div className="flex flex-wrap gap-2">
+                  {livestockTags.map((t) => (
+                    <span
+                      key={t}
+                      className="px-3 py-1 rounded-full bg-stone-100 text-stone-800 text-xs font-medium border border-stone-200"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
-            {farm.produce_types && (
+            {produceTags.length > 0 && (
               <div className="sm:col-span-2">
-                <span className="text-stone-500">Produce:</span>{' '}
-                <span className="text-stone-900">{farm.produce_types}</span>
+                <span className="text-stone-500 text-sm block mb-2">Produce</span>
+                <div className="flex flex-wrap gap-2">
+                  {produceTags.map((t) => (
+                    <span
+                      key={t}
+                      className="px-3 py-1 rounded-full bg-amber-50 text-amber-950 text-xs font-medium border border-amber-200/80"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
-            {farm.regenerative_practices && (
+            {regenerativeTags.length > 0 && (
               <div className="sm:col-span-2">
-                <span className="text-stone-500">Practices:</span>{' '}
-                <span className="text-stone-900">{farm.regenerative_practices}</span>
+                <span className="text-stone-500 text-sm block mb-2">Regenerative & better health (from application)</span>
+                <div className="flex flex-wrap gap-2">
+                  {regenerativeTags.map((t) => (
+                    <span
+                      key={t}
+                      className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 text-xs font-medium border border-emerald-200"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
-            {farm.certifications && (
+            {certTags.length > 0 && (
               <div className="sm:col-span-2">
-                <span className="text-stone-500">Certifications:</span>{' '}
-                <span className="text-stone-900">{farm.certifications}</span>
+                <span className="text-stone-500 text-sm block mb-2">Certifications</span>
+                <div className="flex flex-wrap gap-2">
+                  {certTags.map((t) => (
+                    <span
+                      key={t}
+                      className="px-3 py-1 rounded-full bg-stone-100 text-stone-800 text-xs font-medium border border-stone-200"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {practicesOther && (
+              <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2">
+                <span className="text-stone-600 text-sm block mb-1">Other (submitted text)</span>
+                <p className="text-stone-800 text-sm whitespace-pre-wrap">{practicesOther}</p>
               </div>
             )}
             {farm.description && (

@@ -58,8 +58,14 @@ export default async function SubmissionsPage({
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-stone-900 mb-1">Submissions</h1>
-        <p className="text-sm text-stone-500">Review and manage restaurant dish submissions and farm applications.</p>
+        <h1 className="text-2xl font-bold text-stone-900 mb-1">All applications</h1>
+        <p className="text-sm text-stone-500">
+          Full archive with status filters. For items that need action now, use the{' '}
+          <Link href="/admin/review-queue" className="text-[#2d6a4f] font-medium hover:underline">
+            Review queue
+          </Link>
+          .
+        </p>
       </div>
 
       {/* Tab selector */}
@@ -202,10 +208,14 @@ export default async function SubmissionsPage({
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href={`/admin/farms/${farm.id}`}
+                          href={
+                            farm.status === 'pending'
+                              ? `/admin/farms/${farm.id}/review`
+                              : `/admin/farms/${farm.id}`
+                          }
                           className="text-[#2d6a4f] hover:underline font-medium whitespace-nowrap"
                         >
-                          Review →
+                          {farm.status === 'pending' ? 'Review →' : 'Manage →'}
                         </Link>
                       </td>
                     </tr>

@@ -38,7 +38,7 @@ export default function Header() {
     function setDashboardForRole(profileRole: string | undefined) {
       if (profileRole === 'restaurant') setDashboardHref('/dashboard/restaurant');
       else if (profileRole === 'farm') setDashboardHref('/dashboard/farm');
-      else setDashboardHref('/admin');
+      else setDashboardHref('/admin/review-queue');
     }
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {

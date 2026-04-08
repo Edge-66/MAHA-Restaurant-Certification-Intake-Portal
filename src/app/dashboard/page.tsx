@@ -14,5 +14,5 @@ export default async function DashboardIndexPage() {
 
   if (profile?.role === 'restaurant') redirect('/dashboard/restaurant');
   if (profile?.role === 'farm') redirect('/dashboard/farm');
-  redirect('/admin');
+  redirect('/admin/review-queue');
 }

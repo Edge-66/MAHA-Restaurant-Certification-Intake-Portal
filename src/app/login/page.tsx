@@ -51,7 +51,7 @@ function LoginForm() {
     } else if (profile?.role === 'farm') {
       router.push(safeNext && safeNext.startsWith('/dashboard') ? safeNext : '/dashboard/farm');
     } else {
-      router.push(safeNext && safeNext.startsWith('/admin') ? safeNext : '/admin');
+      router.push(safeNext && safeNext.startsWith('/admin') ? safeNext : '/admin/review-queue');
     }
     router.refresh();
   }

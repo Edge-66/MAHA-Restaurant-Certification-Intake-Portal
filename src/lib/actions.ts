@@ -9,6 +9,11 @@ import {
   sendFarmDecision,
   sendPasswordResetEmail,
 } from '@/lib/email';
+import { geocodeAddress } from '@/lib/geocode';
+
+function farmCertRequiresVerifierAck(certType: string | null | undefined): boolean {
+  return certType === 'aga' || certType === 'raa' || certType === 'other';
+}
 
 type DishPayload = {
   name: string;
@@ -102,6 +107,22 @@ export async function submitApplication(
         if (raw) farmHealthPractices = JSON.parse(raw);
       } catch { /* ignore */ }
 
+      function parseTagJson(key: string): string[] {
+        try {
+          const raw = formData.get(key) as string | null;
+          if (!raw) return [];
+          const a = JSON.parse(raw);
+          return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [];
+        } catch {
+          return [];
+        }
+      }
+
+      const livestockSel = parseTagJson('livestock_json');
+      const produceSel = parseTagJson('produce_json');
+      const regenerativeSel = parseTagJson('regenerative_json');
+      const practicesOtherRaw = ((formData.get('farm_practices_other') as string) || '').trim();
+
       const farmData = {
         name: formData.get('name') as string,
         contact_name: formData.get('contact_name') as string,
@@ -113,9 +134,10 @@ export async function submitApplication(
         state: formData.get('state') as string,
         zip: (formData.get('zip') as string) || null,
         description: (formData.get('description') as string) || null,
-        livestock_types: (formData.get('livestock_types') as string) || null,
-        produce_types: (formData.get('produce_types') as string) || null,
-        regenerative_practices: (formData.get('regenerative_practices') as string) || null,
+        livestock_types: livestockSel.length > 0 ? JSON.stringify(livestockSel) : null,
+        produce_types: produceSel.length > 0 ? JSON.stringify(produceSel) : null,
+        regenerative_practices: regenerativeSel.length > 0 ? JSON.stringify(regenerativeSel) : null,
+        farm_practices_other: practicesOtherRaw || null,
         certifications: (formData.get('certifications') as string) || null,
         cert_type: (formData.get('farm_cert_type') as string) || null,
         cert_other: (formData.get('farm_cert_other') as string) || null,
@@ -389,7 +411,7 @@ export async function loginAdmin(formData: FormData) {
     return { error: error.message };
   }
 
-  redirect('/admin');
+  redirect('/admin/review-queue');
 }
 
 export async function logoutAdmin() {
@@ -517,6 +539,93 @@ export async function updateFarmContact(
     .eq('id', farmId);
 
   if (error) return { error: error.message };
+  return {};
+}
+
+/**
+ * Reviewer workflow: set farm listing status. Tier 2+.
+ * Approving AGA / Regen Organic / Other requires certVerificationConfirmed.
+ */
+export async function submitFarmReviewDecision(
+  farmId: string,
+  decision: 'approved' | 'rejected' | 'pending',
+  options?: { certVerificationConfirmed?: boolean }
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) return { error: 'Not authenticated.' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('admin_tier, role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'admin' || (profile?.admin_tier ?? 1) < 2) {
+    return { error: 'Reviewer access (Tier 2+) required.' };
+  }
+
+  const { data: farm, error: fetchErr } = await supabase
+    .from('farms')
+    .select('*')
+    .eq('id', farmId)
+    .single();
+
+  if (fetchErr || !farm) return { error: 'Farm not found.' };
+
+  const prevStatus = farm.status as string;
+  const certType = farm.cert_type as string | null | undefined;
+
+  if (decision === 'approved' && farmCertRequiresVerifierAck(certType)) {
+    if (!options?.certVerificationConfirmed) {
+      return {
+        error:
+          'Confirm that you have verified this farm’s certification documentation before approving.',
+      };
+    }
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    status: decision,
+    reviewed_by: user.email,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (decision === 'approved') {
+    updatePayload.approved_at = new Date().toISOString();
+    if (farmCertRequiresVerifierAck(certType)) {
+      updatePayload.cert_verified_at = new Date().toISOString();
+      updatePayload.cert_verified_by = user.email;
+    } else {
+      updatePayload.cert_verified_at = null;
+      updatePayload.cert_verified_by = null;
+    }
+
+    if (!farm.latitude && farm.city && farm.state) {
+      const geo = await geocodeAddress(
+        farm.address || '',
+        farm.city as string,
+        farm.state as string,
+        farm.zip
+      );
+      if (geo) {
+        updatePayload.latitude = geo.latitude;
+        updatePayload.longitude = geo.longitude;
+      }
+    }
+  } else {
+    updatePayload.approved_at = null;
+    updatePayload.cert_verified_at = null;
+    updatePayload.cert_verified_by = null;
+  }
+
+  const { error: upErr } = await supabase.from('farms').update(updatePayload).eq('id', farmId);
+  if (upErr) return { error: upErr.message };
+
+  if (prevStatus !== decision && (decision === 'approved' || decision === 'rejected')) {
+    notifyFarmDecision(farmId, decision).catch(() => {});
+  }
+
   return {};
 }
 

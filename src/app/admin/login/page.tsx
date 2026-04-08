@@ -32,7 +32,7 @@ export default function AdminLoginPage() {
     } else if (profile?.role === 'farm') {
       router.push('/dashboard/farm');
     } else {
-      router.push('/admin');
+      router.push('/admin/review-queue');
     }
     router.refresh();
   }

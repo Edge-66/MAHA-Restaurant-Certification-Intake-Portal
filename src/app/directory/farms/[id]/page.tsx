@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { parseFarmTagField } from '@/lib/farmTags';
 
 export const revalidate = 60;
 
@@ -12,11 +13,6 @@ function safeParseArray(val: string | null): string[] {
   } catch {
     return [];
   }
-}
-
-function splitCommas(val: string | null): string[] {
-  if (!val) return [];
-  return val.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 export default async function FarmProfilePage({
@@ -43,10 +39,14 @@ export default async function FarmProfilePage({
   }
 
   const photos = safeParseArray(farm.photo_urls);
-  const livestock = splitCommas(farm.livestock_types);
-  const produce = splitCommas(farm.produce_types);
-  const practices = splitCommas(farm.regenerative_practices);
-  const certs = splitCommas(farm.certifications);
+  const livestock = parseFarmTagField(farm.livestock_types);
+  const produce = parseFarmTagField(farm.produce_types);
+  const practices = parseFarmTagField(farm.regenerative_practices);
+  const healthTags: string[] = Array.isArray(farm.health_practices)
+    ? (farm.health_practices as string[])
+    : [];
+  const certs = parseFarmTagField(farm.certifications);
+  const otherPractices = (farm.farm_practices_other ?? '').trim();
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -123,20 +123,46 @@ export default async function FarmProfilePage({
           </div>
         )}
 
-        {/* Regenerative Practices */}
+        {/* Regenerative & better health (structured tags) */}
         {practices.length > 0 && (
           <div className="bg-white border border-stone-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-stone-900 mb-4">Regenerative Practices</h2>
-            <ul className="space-y-3">
+            <h2 className="text-lg font-semibold text-stone-900 mb-4">Regenerative & better health practices</h2>
+            <div className="flex flex-wrap gap-2">
               {practices.map((practice) => (
-                <li key={practice} className="flex items-start gap-3 text-sm">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-stone-700">{practice}</span>
-                </li>
+                <span
+                  key={practice}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-sm font-medium"
+                >
+                  {practice}
+                </span>
               ))}
-            </ul>
+            </div>
+          </div>
+        )}
+
+        {healthTags.length > 0 && (
+          <div className="bg-white border border-stone-200 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-stone-900 mb-4">Better health practices</h2>
+            <div className="flex flex-wrap gap-2">
+              {healthTags.map((p) => (
+                <span
+                  key={p}
+                  className="px-3 py-1.5 rounded-lg bg-[#2d6a4f]/10 text-[#2d6a4f] border border-[#2d6a4f]/25 text-sm font-medium"
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {otherPractices && (
+          <div className="bg-white border border-amber-200 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-stone-900 mb-2">Additional details</h2>
+            <p className="text-xs text-amber-900/80 mb-3">
+              Submitted under &quot;Other&quot; — listed here for transparency; MAHA may verify separately.
+            </p>
+            <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-wrap">{otherPractices}</p>
           </div>
         )}
 

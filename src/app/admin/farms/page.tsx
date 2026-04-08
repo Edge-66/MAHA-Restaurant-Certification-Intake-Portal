@@ -85,10 +85,14 @@ export default async function AdminFarmsPage({
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link
-                      href={`/admin/farms/${farm.id}`}
+                      href={
+                        farm.status === 'pending'
+                          ? `/admin/farms/${farm.id}/review`
+                          : `/admin/farms/${farm.id}`
+                      }
                       className="text-[#2d6a4f] hover:underline font-medium"
                     >
-                      Review →
+                      {farm.status === 'pending' ? 'Review →' : 'Manage →'}
                     </Link>
                   </td>
                 </tr>

@@ -4,6 +4,11 @@ import { useRef, useState } from 'react';
 import DishFormSection from '@/components/DishFormSection';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
 import { submitApplication, uploadCertFile } from '@/lib/actions';
+import {
+  FARM_LIVESTOCK_OPTIONS,
+  FARM_PRODUCE_OPTIONS,
+  FARM_REGENERATIVE_OPTIONS,
+} from '@/lib/farmApplyOptions';
 
 const HEALTH_PRACTICE_OPTIONS = [
   'Locally sourced ingredients',
@@ -59,6 +64,21 @@ export default function ApplyPage() {
   const [farmCertOther, setFarmCertOther] = useState('');
   const [farmCertFileUrl, setFarmCertFileUrl] = useState('');
   const [farmCertUploading, setFarmCertUploading] = useState(false);
+
+  const [farmLivestock, setFarmLivestock] = useState<string[]>([]);
+  const [farmProduce, setFarmProduce] = useState<string[]>([]);
+  const [farmRegenerative, setFarmRegenerative] = useState<string[]>([]);
+  const [farmPracticesOther, setFarmPracticesOther] = useState('');
+
+  function toggleFarmTag(
+    selected: string[],
+    setSelected: (v: string[]) => void,
+    label: string
+  ) {
+    setSelected(
+      selected.includes(label) ? selected.filter((p) => p !== label) : [...selected, label]
+    );
+  }
 
   function togglePractice(label: string) {
     setHealthPractices((prev) =>
@@ -167,6 +187,10 @@ export default function ApplyPage() {
       formData.set('farm_cert_type', resolvedCertType);
       if (farmCertOther) formData.set('farm_cert_other', farmCertOther);
       if (farmCertFileUrl) formData.set('farm_cert_file_url', farmCertFileUrl);
+      formData.set('livestock_json', JSON.stringify(farmLivestock));
+      formData.set('produce_json', JSON.stringify(farmProduce));
+      formData.set('regenerative_json', JSON.stringify(farmRegenerative));
+      formData.set('farm_practices_other', farmPracticesOther.trim());
     }
 
     try {
@@ -441,21 +465,130 @@ export default function ApplyPage() {
           ) : (
             <>
               <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
-                <h2 className="text-xl font-semibold text-stone-900 mb-5">Farm Details</h2>
-                <div className="space-y-4">
+                <h2 className="text-xl font-semibold text-stone-900 mb-1">What you raise & grow</h2>
+                <p className="text-sm text-stone-500 mb-6">
+                  Select all that apply. These become tags on your public farm profile after approval.
+                </p>
+
+                <div className="space-y-8">
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Livestock Types</label>
-                    <input type="text" name="livestock_types" className={inp} placeholder="e.g. Cattle, Poultry, Pigs (comma-separated)" />
-                    <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
+                    <h3 className="text-sm font-semibold text-stone-800 mb-3">Livestock</h3>
+                    <p className="text-xs text-stone-500 mb-3">Skip if you don&apos;t raise animals.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {FARM_LIVESTOCK_OPTIONS.map((label) => {
+                        const checked = farmLivestock.includes(label);
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => toggleFarmTag(farmLivestock, setFarmLivestock, label)}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
+                              checked
+                                ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
+                                : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+                                checked ? 'bg-[#2d6a4f] border-[#2d6a4f]' : 'border-stone-300'
+                              }`}
+                            >
+                              {checked && (
+                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Produce Types</label>
-                    <input type="text" name="produce_types" className={inp} placeholder="e.g. Vegetables, Herbs, Grains (comma-separated)" />
-                    <p className="text-xs text-stone-400 mt-1">Leave blank if not applicable</p>
+                    <h3 className="text-sm font-semibold text-stone-800 mb-3">Produce & products</h3>
+                    <p className="text-xs text-stone-500 mb-3">Skip if not applicable.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {FARM_PRODUCE_OPTIONS.map((label) => {
+                        const checked = farmProduce.includes(label);
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => toggleFarmTag(farmProduce, setFarmProduce, label)}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
+                              checked
+                                ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
+                                : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+                                checked ? 'bg-[#2d6a4f] border-[#2d6a4f]' : 'border-stone-300'
+                              }`}
+                            >
+                              {checked && (
+                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-1">Regenerative / Better Health Practices</label>
-                    <textarea name="regenerative_practices" rows={3} className={inp} placeholder="Describe any regenerative, sustainable, or better health practices your farm follows…" />
+                    <h3 className="text-sm font-semibold text-stone-800 mb-3">Regenerative & better health practices</h3>
+                    <p className="text-xs text-stone-500 mb-3">On-farm practices you want to highlight publicly.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {FARM_REGENERATIVE_OPTIONS.map((label) => {
+                        const checked = farmRegenerative.includes(label);
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => toggleFarmTag(farmRegenerative, setFarmRegenerative, label)}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
+                              checked
+                                ? 'border-[#2d6a4f] bg-[#2d6a4f]/5 text-[#2d6a4f]'
+                                : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+                                checked ? 'bg-[#2d6a4f] border-[#2d6a4f]' : 'border-stone-300'
+                              }`}
+                            >
+                              {checked && (
+                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-stone-200 pt-6">
+                    <label className="block text-sm font-semibold text-stone-800 mb-1">Other (describe)</label>
+                    <p className="text-xs text-stone-500 mb-2">
+                      Use only for items not listed above. MAHA may require additional verification before showing these
+                      details publicly.
+                    </p>
+                    <textarea
+                      value={farmPracticesOther}
+                      onChange={(e) => setFarmPracticesOther(e.target.value)}
+                      rows={3}
+                      className={inp}
+                      placeholder="e.g. Heritage breed program, on-farm slaughter, custom grazing contracts…"
+                    />
                   </div>
                 </div>
               </div>
@@ -587,6 +720,25 @@ export default function ApplyPage() {
               <p><span className="font-medium text-stone-800">Type:</span> {applicantType === 'restaurant' ? 'Restaurant' : 'Farm / Producer'}</p>
               {applicantType === 'restaurant' && (
                 <p><span className="font-medium text-stone-800">Dishes:</span> {dishes.length} submitted</p>
+              )}
+              {applicantType === 'farm' && (
+                <>
+                  <p>
+                    <span className="font-medium text-stone-800">Livestock:</span>{' '}
+                    {farmLivestock.length > 0 ? `${farmLivestock.length} selected` : 'None selected'}
+                  </p>
+                  <p>
+                    <span className="font-medium text-stone-800">Produce:</span>{' '}
+                    {farmProduce.length > 0 ? `${farmProduce.length} selected` : 'None selected'}
+                  </p>
+                  <p>
+                    <span className="font-medium text-stone-800">Practices:</span>{' '}
+                    {farmRegenerative.length > 0 ? `${farmRegenerative.length} selected` : 'None selected'}
+                  </p>
+                  {farmPracticesOther.trim() && (
+                    <p><span className="font-medium text-stone-800">Other details:</span> provided (subject to verification)</p>
+                  )}
+                </>
               )}
             </div>
           </div>

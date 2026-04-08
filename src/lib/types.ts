@@ -91,6 +91,8 @@ export interface Farm {
   livestock_types: string | null;
   produce_types: string | null;
   regenerative_practices: string | null;
+  /** Custom practices not covered by checkboxes; verify before highlighting publicly */
+  farm_practices_other?: string | null;
   certifications: string | null;
   cert_type: 'usda' | 'aga' | 'raa' | 'other' | 'none' | null;
   cert_other: string | null;
@@ -103,6 +105,9 @@ export interface Farm {
   status: 'pending' | 'approved' | 'rejected';
   approved_at: string | null;
   reviewed_by: string | null;
+  /** Set when a reviewer confirms non-USDA certification was verified */
+  cert_verified_at: string | null;
+  cert_verified_by: string | null;
   created_at: string;
   updated_at: string;
 }

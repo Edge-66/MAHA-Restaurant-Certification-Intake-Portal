@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
       const role = await profileRole();
       if (role === 'restaurant') return redirectTo('/dashboard/restaurant');
       if (role === 'farm') return redirectTo('/dashboard/farm');
-      return redirectTo('/admin');
+      return redirectTo('/admin/review-queue');
     }
     return supabaseResponse;
   }
@@ -69,7 +69,7 @@ export async function middleware(request: NextRequest) {
       const role = await profileRole();
       if (role === 'farm') return redirectTo('/dashboard/farm');
       if (role === 'restaurant') return redirectTo('/dashboard/restaurant/add-dishes');
-      if (role === 'admin') return redirectTo('/admin');
+      if (role === 'admin') return redirectTo('/admin/review-queue');
     }
     return supabaseResponse;
   }
@@ -84,15 +84,15 @@ export async function middleware(request: NextRequest) {
     }
     const role = await profileRole();
     if (role === 'admin' || !role) {
-      return redirectTo('/admin');
+      return redirectTo('/admin/review-queue');
     }
     if (path.startsWith('/dashboard/restaurant') && role !== 'restaurant') {
       if (role === 'farm') return redirectTo('/dashboard/farm');
-      return redirectTo('/admin');
+      return redirectTo('/admin/review-queue');
     }
     if (path.startsWith('/dashboard/farm') && role !== 'farm') {
       if (role === 'restaurant') return redirectTo('/dashboard/restaurant');
-      return redirectTo('/admin');
+      return redirectTo('/admin/review-queue');
     }
     return supabaseResponse;
   }
@@ -106,7 +106,7 @@ export async function middleware(request: NextRequest) {
       const role = await profileRole();
       if (role === 'restaurant') return redirectTo('/dashboard/restaurant');
       if (role === 'farm') return redirectTo('/dashboard/farm');
-      return redirectTo('/admin');
+      return redirectTo('/admin/review-queue');
     }
     return supabaseResponse;
   }

@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import FarmReviewActions from '@/components/FarmReviewActions';
 import type { Farm } from '@/lib/types';
-import { geocodeAddress } from '@/lib/geocode';
-import { notifyFarmDecision, sendPasswordResetForFarm, deleteFarm } from '@/lib/actions';
+import { sendPasswordResetForFarm, deleteFarm } from '@/lib/actions';
+import { parseFarmTagField, serializeFarmTagsFromText } from '@/lib/farmTags';
 
 function parsePhotoUrls(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -32,7 +34,6 @@ export default function AdminFarmDetailPage() {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminTier, setAdminTier] = useState(1);
   const [uploading, setUploading] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('');
   const [dangerConfirm, setDangerConfirm] = useState<'reset' | 'delete' | null>(null);
   const [dangerWorking, setDangerWorking] = useState(false);
   const [dangerMessage, setDangerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -50,6 +51,7 @@ export default function AdminFarmDetailPage() {
     produce_types: '',
     regenerative_practices: '',
     certifications: '',
+    farm_practices_other: '',
   });
 
   useEffect(() => {
@@ -76,7 +78,6 @@ export default function AdminFarmDetailPage() {
 
     if (data) {
       setFarm(data as Farm);
-      setSelectedStatus(data.status);
       setEditFields({
         contact_name: data.contact_name || '',
         contact_email: data.contact_email || '',
@@ -87,10 +88,11 @@ export default function AdminFarmDetailPage() {
         state: data.state || '',
         zip: data.zip || '',
         description: data.description || '',
-        livestock_types: data.livestock_types || '',
-        produce_types: data.produce_types || '',
-        regenerative_practices: data.regenerative_practices || '',
-        certifications: data.certifications || '',
+        livestock_types: parseFarmTagField(data.livestock_types).join(', '),
+        produce_types: parseFarmTagField(data.produce_types).join(', '),
+        regenerative_practices: parseFarmTagField(data.regenerative_practices).join(', '),
+        certifications: parseFarmTagField(data.certifications).join(', '),
+        farm_practices_other: (data as Farm).farm_practices_other?.trim() ?? '',
       });
     }
     setLoading(false);
@@ -100,44 +102,31 @@ export default function AdminFarmDetailPage() {
     fetchFarm();
   }, [fetchFarm]);
 
-  const handleUpdateStatus = async () => {
+  const handleSaveProfile = async () => {
     setSaving(true);
     const supabase = getSupabase();
-
-    const updateData: Record<string, unknown> = {
-      status: selectedStatus,
-      ...editFields,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (selectedStatus === 'approved') {
-      updateData.approved_at = new Date().toISOString();
-
-      // Auto-geocode farm address for map
-      if (farm && !farm.latitude && farm.city && farm.state) {
-        const geo = await geocodeAddress(
-          farm.address || '',
-          farm.city,
-          farm.state,
-          farm.zip
-        );
-        if (geo) {
-          updateData.latitude = geo.latitude;
-          updateData.longitude = geo.longitude;
-        }
-      }
-    }
-
-    updateData.reviewed_by = adminEmail || null;
-    await supabase.from('farms').update(updateData).eq('id', id);
-    const prevStatus = farm?.status;
+    const {
+      livestock_types,
+      produce_types,
+      regenerative_practices,
+      certifications,
+      farm_practices_other,
+      ...profileRest
+    } = editFields;
+    await supabase
+      .from('farms')
+      .update({
+        ...profileRest,
+        livestock_types: serializeFarmTagsFromText(livestock_types),
+        produce_types: serializeFarmTagsFromText(produce_types),
+        regenerative_practices: serializeFarmTagsFromText(regenerative_practices),
+        certifications: serializeFarmTagsFromText(certifications),
+        farm_practices_other: farm_practices_other.trim() || null,
+        updated_at: new Date().toISOString(),
+        reviewed_by: adminEmail || null,
+      })
+      .eq('id', id);
     await fetchFarm();
-
-    // Email + in-app notification when status changes
-    if (selectedStatus !== prevStatus && (selectedStatus === 'approved' || selectedStatus === 'rejected')) {
-      notifyFarmDecision(id, selectedStatus).catch(() => {});
-    }
-
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -273,6 +262,21 @@ export default function AdminFarmDetailPage() {
         ← Back to Submissions
       </button>
 
+      {farm.status === 'pending' && (
+        <div className="mb-6 rounded-xl border border-[#2d6a4f]/30 bg-[#2d6a4f]/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-stone-700">
+            <strong className="text-stone-900">Review workspace:</strong> Approve / reject / pending with certification
+            checks and queue navigation.
+          </p>
+          <Link
+            href={`/admin/farms/${id}/review`}
+            className="shrink-0 text-sm font-semibold text-white bg-[#2d6a4f] hover:bg-[#1b4332] px-4 py-2 rounded-lg transition-colors"
+          >
+            Open farm review →
+          </Link>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -395,6 +399,16 @@ export default function AdminFarmDetailPage() {
               placeholder="Comma-separated"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Other practices (free text)</label>
+            <textarea
+              value={editFields.farm_practices_other}
+              onChange={(e) => setEditFields({ ...editFields, farm_practices_other: e.target.value })}
+              rows={2}
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
+              placeholder="From applicant “Other” field — verify before promoting"
+            />
+          </div>
         </div>
       </div>
 
@@ -447,51 +461,46 @@ export default function AdminFarmDetailPage() {
         </label>
       </div>
 
-      {/* Status Update */}
+      {/* Status & review actions */}
       <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-stone-900 mb-4">Status & Actions</h2>
-        <div className="space-y-4">
-          {adminTier >= 2 ? (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Farm Status</label>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-                {selectedStatus === 'approved' && farm.status !== 'approved' && (
-                  <p className="text-xs text-green-700 mt-1">
-                    Approving will make this farm visible in the public directory.
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-4 flex-wrap">
-                <button
-                  onClick={handleUpdateStatus}
-                  disabled={saving}
-                  className="bg-[#2d6a4f] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#1b4332] transition-colors disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-                {farm.reviewed_by && farm.updated_at && (
-                  <p className="text-xs text-stone-400">
-                    Last updated by <span className="font-medium text-stone-500">{farm.reviewed_by}</span>
-                    {' '}on {new Date(farm.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-              You have <strong>Editor</strong> access. Approving or rejecting farms requires Reviewer (Tier 2) or higher. Contact a Super Admin to adjust your permissions.
-            </div>
-          )}
+        <h2 className="text-lg font-semibold text-stone-900 mb-2">Listing status</h2>
+        <p className="text-sm text-stone-500 mb-4">
+          Use <strong>Approve</strong>, <strong>Reject</strong>, or <strong>Pending</strong> for decisions. For pending
+          applications, the{' '}
+          <Link href={`/admin/farms/${id}/review`} className="text-[#2d6a4f] font-medium hover:underline">
+            review workspace
+          </Link>{' '}
+          shows certifications and queue navigation.
+        </p>
+        <FarmReviewActions
+          farmId={id}
+          certType={farm.cert_type}
+          adminTier={adminTier}
+          onCompleted={() => fetchFarm()}
+        />
+        <div className="mt-6 pt-6 border-t border-stone-100">
+          <button
+            type="button"
+            onClick={handleSaveProfile}
+            disabled={saving}
+            className="bg-white border border-stone-300 text-stone-800 px-6 py-2.5 rounded-lg font-medium hover:bg-stone-50 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save profile & farm details only'}
+          </button>
+          <p className="text-xs text-stone-400 mt-2">
+            Saves contact info, description, and types below without changing listing status.
+          </p>
         </div>
+        {farm.reviewed_by && farm.updated_at && (
+          <p className="text-xs text-stone-400 mt-4">
+            Last listing update by <span className="font-medium text-stone-500">{farm.reviewed_by}</span> on{' '}
+            {new Date(farm.updated_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+          </p>
+        )}
       </div>
       {/* Danger Zone — Tier 3 only */}
       {adminTier >= 3 && (
