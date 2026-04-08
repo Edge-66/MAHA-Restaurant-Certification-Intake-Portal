@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
 import FarmReviewActions from '@/components/FarmReviewActions';
+import { useImageCropper } from '@/components/ImageCropper';
 import type { Farm } from '@/lib/types';
 import { sendPasswordResetForFarm, deleteFarm } from '@/lib/actions';
 import { parseFarmTagField, serializeFarmTagsFromText } from '@/lib/farmTags';
@@ -37,6 +38,7 @@ export default function AdminFarmDetailPage() {
   const [dangerConfirm, setDangerConfirm] = useState<'reset' | 'delete' | null>(null);
   const [dangerWorking, setDangerWorking] = useState(false);
   const [dangerMessage, setDangerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { requestCrop, cropperModal } = useImageCropper();
   const [editFields, setEditFields] = useState({
     contact_name: '',
     contact_email: '',
@@ -133,7 +135,10 @@ export default function AdminFarmDetailPage() {
   };
 
   const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const selected = e.target.files?.[0];
+    e.target.value = '';
+    if (!selected) return;
+    const file = selected.type.startsWith('image/') ? await requestCrop(selected, { aspect: 16 / 9 }) : selected;
     if (!file) return;
     setUploading(true);
 
@@ -158,6 +163,7 @@ export default function AdminFarmDetailPage() {
 
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
+    e.target.value = '';
     if (!files || files.length === 0) return;
     setUploading(true);
 
@@ -165,7 +171,9 @@ export default function AdminFarmDetailPage() {
     const currentPhotos: string[] = parsePhotoUrls(farm?.photo_urls);
     const newUrls = [...currentPhotos];
 
-    for (const file of Array.from(files)) {
+    for (const originalFile of Array.from(files)) {
+      const file = originalFile.type.startsWith('image/') ? await requestCrop(originalFile, { aspect: 16 / 9 }) : originalFile;
+      if (!file) continue;
       const ext = file.name.split('.').pop();
       const path = `farms/${id}/gallery-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
 
@@ -250,6 +258,7 @@ export default function AdminFarmDetailPage() {
 
   return (
     <div className="max-w-4xl">
+      {cropperModal}
       {saved && (
         <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg text-sm font-medium">
           Changes saved successfully.

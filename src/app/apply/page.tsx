@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import DishFormSection from '@/components/DishFormSection';
+import { useImageCropper } from '@/components/ImageCropper';
 import { DishFormData, US_STATES, US_STATE_NAMES } from '@/lib/types';
 import { submitApplication, uploadCertFile } from '@/lib/actions';
 import {
@@ -64,6 +65,7 @@ export default function ApplyPage() {
   const [farmCertOther, setFarmCertOther] = useState('');
   const [farmCertFileUrl, setFarmCertFileUrl] = useState('');
   const [farmCertUploading, setFarmCertUploading] = useState(false);
+  const { requestCrop, cropperModal } = useImageCropper();
 
   const [farmLivestock, setFarmLivestock] = useState<string[]>([]);
   const [farmProduce, setFarmProduce] = useState<string[]>([]);
@@ -249,6 +251,7 @@ export default function ApplyPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      {cropperModal}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-stone-900 mb-1">Apply for Certification</h1>
         <p className="text-stone-500 text-sm">Complete the steps below to apply for the MAHA From the Farm program.</p>
@@ -686,7 +689,12 @@ export default function ApplyPage() {
                               className="hidden"
                               disabled={farmCertUploading}
                               onChange={async (e) => {
-                                const file = e.target.files?.[0];
+                                const selected = e.target.files?.[0];
+                                e.target.value = '';
+                                if (!selected) return;
+                                const file = selected.type.startsWith('image/')
+                                  ? await requestCrop(selected)
+                                  : selected;
                                 if (!file) return;
                                 setFarmCertUploading(true);
                                 try {

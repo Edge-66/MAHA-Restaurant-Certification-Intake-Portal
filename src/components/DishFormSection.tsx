@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { DishFormData, DISH_CATEGORIES, US_STATES, US_STATE_NAMES } from '@/lib/types';
 import { uploadCertFile } from '@/lib/actions';
+import { useImageCropper } from '@/components/ImageCropper';
 
 interface DishFormSectionProps {
   index: number;
@@ -17,13 +18,17 @@ const input = 'w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus
 export default function DishFormSection({ index, dish, onChange, onRemove, canRemove }: DishFormSectionProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const { requestCrop, cropperModal } = useImageCropper();
 
   const update = (field: keyof DishFormData, value: string | boolean) => {
     onChange(index, { ...dish, [field]: value });
   };
 
   async function handleCertFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const selected = e.target.files?.[0];
+    e.target.value = '';
+    if (!selected) return;
+    const file = selected.type.startsWith('image/') ? await requestCrop(selected) : selected;
     if (!file) return;
     setUploading(true);
     setUploadError('');
@@ -45,6 +50,7 @@ export default function DishFormSection({ index, dish, onChange, onRemove, canRe
 
   return (
     <div className="border border-stone-200 rounded-xl p-6 bg-white relative">
+      {cropperModal}
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-stone-800">Dish #{index + 1}</h3>
         {canRemove && (

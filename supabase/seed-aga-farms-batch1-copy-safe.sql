@@ -1,11 +1,3 @@
--- =============================================================================
--- Batch 1: AGA-certified farms (updated mapping import)
--- Run in Supabase SQL Editor once. These rows have NO auth users — profiles are
--- not created (same pattern as listing-only farms you add manually).
---
--- Source: user-provided remapped list, batch 1 (6 farms).
--- =============================================================================
-
 INSERT INTO farms (
   name,
   contact_name,
@@ -36,7 +28,7 @@ INSERT INTO farms (
     'CO',
     '81069',
     'Grass-fed beef. American Grassfed Association (AGA) certified.',
-    '["Beef"]',
+    'Beef',
     NULL,
     NULL,
     'American Grassfed Association (AGA)',
@@ -55,7 +47,7 @@ INSERT INTO farms (
     'GA',
     '39897',
     'Grass-fed beef. American Grassfed Association (AGA) certified.',
-    '["Beef"]',
+    'Beef',
     NULL,
     NULL,
     'American Grassfed Association (AGA)',
@@ -74,7 +66,7 @@ INSERT INTO farms (
     'MN',
     '56353',
     'Grass-fed beef. American Grassfed Association (AGA) certified.',
-    '["Beef"]',
+    'Beef',
     NULL,
     NULL,
     'American Grassfed Association (AGA)',
@@ -93,7 +85,7 @@ INSERT INTO farms (
     'CA',
     NULL,
     'Grass-fed beef. American Grassfed Association (AGA) certified.',
-    '["Beef"]',
+    'Beef',
     NULL,
     NULL,
     'American Grassfed Association (AGA)',
@@ -112,7 +104,7 @@ INSERT INTO farms (
     'CO',
     '81419',
     'Grass-fed beef. American Grassfed Association (AGA) certified.',
-    '["Beef"]',
+    'Beef',
     NULL,
     NULL,
     'American Grassfed Association (AGA)',
@@ -131,7 +123,7 @@ INSERT INTO farms (
     'CA',
     '94060',
     'Grass-fed beef. American Grassfed Association (AGA) certified.',
-    '["Beef"]',
+    'Beef',
     NULL,
     NULL,
     'American Grassfed Association (AGA)',

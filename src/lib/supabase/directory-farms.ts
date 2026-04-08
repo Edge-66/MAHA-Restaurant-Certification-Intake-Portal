@@ -20,12 +20,13 @@ export async function fetchApprovedFarmsForDirectory(): Promise<Farm[]> {
       const { data, error } = await admin
         .from('farms')
         .select('*')
-        .eq('status', 'approved')
         .order('name');
       if (error) {
         logDirectory('service_role error', error.message, true);
       } else {
-        const rows = (data ?? []) as Farm[];
+        const rows = ((data ?? []) as Farm[]).filter(
+          (f) => (f.status ?? '').trim().toLowerCase() === 'approved'
+        );
         logDirectory('service_role OK', `${rows.length} approved farms loaded`);
         return rows;
       }
@@ -44,10 +45,11 @@ export async function fetchApprovedFarmsForDirectory(): Promise<Farm[]> {
   const { data, error } = await supabase
     .from('farms')
     .select('*')
-    .eq('status', 'approved')
     .order('name');
   if (error) logDirectory('anon error', error.message, true);
-  const rows = (data ?? []) as Farm[];
+  const rows = ((data ?? []) as Farm[]).filter(
+    (f) => (f.status ?? '').trim().toLowerCase() === 'approved'
+  );
   logDirectory('anon result', `${rows.length} approved farms loaded`);
   return rows;
 }
