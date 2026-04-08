@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Farm } from '@/lib/types';
 import { distanceMiles } from '@/lib/geocode';
 import Reveal from '@/components/Reveal';
+import { DEFAULT_FARM_HERO_IMAGE } from '@/lib/farmDefaults';
 
 // Dynamic import to avoid SSR issues with Leaflet
 const DirectoryMap = dynamic(() => import('@/components/DirectoryMap'), { ssr: false });
@@ -312,25 +313,20 @@ export default function DirectoryClient({ restaurants, farms }: Props) {
                 const distance = searchCenter && farm.latitude && farm.longitude
                   ? distanceMiles(searchCenter[0], searchCenter[1], farm.latitude, farm.longitude)
                   : null;
+                const heroImageUrl = farm.hero_image_url?.trim() || DEFAULT_FARM_HERO_IMAGE;
                 return (
                   <Link
                     key={farm.id}
                     href={`/directory/farms/${farm.id}`}
                     className="bg-white border border-stone-200 rounded-xl overflow-hidden hover:shadow-lg transition-all hover:border-[#2d6a4f]/30 group"
                   >
-                    {farm.hero_image_url ? (
-                      <div className="h-48 bg-stone-100 overflow-hidden">
-                        <img
-                          src={farm.hero_image_url}
-                          alt={farm.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-48 bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-                        <span className="text-4xl text-green-300 font-bold">{farm.name.charAt(0)}</span>
-                      </div>
-                    )}
+                    <div className="h-48 bg-stone-100 overflow-hidden">
+                      <img
+                        src={heroImageUrl}
+                        alt={farm.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
                     <div className="p-6">
                       <h2 className="text-lg font-semibold text-stone-900 group-hover:text-[#2d6a4f] transition-colors mb-1">
                         {farm.name}

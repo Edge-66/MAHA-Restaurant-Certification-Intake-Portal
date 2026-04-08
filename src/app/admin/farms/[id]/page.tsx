@@ -10,6 +10,7 @@ import { useImageCropper } from '@/components/ImageCropper';
 import type { Farm } from '@/lib/types';
 import { sendPasswordResetForFarm, deleteFarm } from '@/lib/actions';
 import { parseFarmTagField, serializeFarmTagsFromText } from '@/lib/farmTags';
+import { DEFAULT_FARM_HERO_IMAGE } from '@/lib/farmDefaults';
 
 function parsePhotoUrls(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -255,6 +256,7 @@ export default function AdminFarmDetailPage() {
   }
 
   const galleryPhotos = parsePhotoUrls(farm.photo_urls);
+  const heroImageUrl = farm.hero_image_url?.trim() || DEFAULT_FARM_HERO_IMAGE;
 
   return (
     <div className="max-w-4xl">
@@ -425,15 +427,9 @@ export default function AdminFarmDetailPage() {
       <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold text-stone-900 mb-4">Hero Image</h2>
         <p className="text-xs text-stone-500 mb-4">This is the main banner image shown on the farm&apos;s profile page.</p>
-        {farm.hero_image_url ? (
-          <div className="mb-4">
-            <img src={farm.hero_image_url} alt="Hero" className="w-full h-48 object-cover rounded-lg" />
-          </div>
-        ) : (
-          <div className="mb-4 h-32 bg-stone-100 rounded-lg flex items-center justify-center text-stone-400 text-sm">
-            No hero image set
-          </div>
-        )}
+        <div className="mb-4">
+          <img src={heroImageUrl} alt="Hero" className="w-full h-48 object-cover rounded-lg" />
+        </div>
         <label className="inline-block bg-white border border-stone-300 rounded-lg px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 cursor-pointer transition-colors">
           {uploading ? 'Uploading...' : 'Upload Hero Image'}
           <input type="file" accept="image/*" onChange={handleHeroUpload} className="hidden" disabled={uploading} />

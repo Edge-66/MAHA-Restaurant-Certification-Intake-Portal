@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { parseFarmTagField } from '@/lib/farmTags';
 import { fetchFarmByIdForPublicProfile } from '@/lib/supabase/directory-farms';
+import { DEFAULT_FARM_HERO_IMAGE } from '@/lib/farmDefaults';
 
 export const revalidate = 60;
 
@@ -43,6 +44,7 @@ export default async function FarmProfilePage({
     : [];
   const certs = parseFarmTagField(farm.certifications);
   const otherPractices = (farm.farm_practices_other ?? '').trim();
+  const heroImageUrl = farm.hero_image_url?.trim() || DEFAULT_FARM_HERO_IMAGE;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -54,19 +56,13 @@ export default async function FarmProfilePage({
       </Link>
 
       {/* Hero */}
-      {farm.hero_image_url ? (
-        <div className="rounded-2xl overflow-hidden mb-8 h-72 md:h-96">
-          <img
-            src={farm.hero_image_url}
-            alt={farm.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        <div className="rounded-2xl overflow-hidden mb-8 h-48 bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-          <span className="text-6xl text-green-200 font-bold">{farm.name.charAt(0)}</span>
-        </div>
-      )}
+      <div className="rounded-2xl overflow-hidden mb-8 h-72 md:h-96">
+        <img
+          src={heroImageUrl}
+          alt={farm.name}
+          className="w-full h-full object-cover"
+        />
+      </div>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">

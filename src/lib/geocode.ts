@@ -6,26 +6,50 @@ interface GeoResult {
   longitude: number;
 }
 
+async function queryNominatim(query: string): Promise<GeoResult | null> {
+  const email = process.env.GEOCODER_CONTACT_EMAIL;
+  const contactSuffix = email ? ` (${email})` : '';
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=us&limit=1${
+    email ? `&email=${encodeURIComponent(email)}` : ''
+  }`;
+
+  const res = await fetch(url, {
+    headers: { 'User-Agent': `MAHA-FromTheFarm/1.0${contactSuffix}` },
+  });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  if (data && data.length > 0) {
+    return {
+      latitude: parseFloat(data[0].lat),
+      longitude: parseFloat(data[0].lon),
+    };
+  }
+  return null;
+}
+
 export async function geocodeAddress(
   address: string,
   city: string,
   state: string,
   zip?: string | null
 ): Promise<GeoResult | null> {
-  const query = [address, city, state, zip].filter(Boolean).join(', ');
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=us&limit=1`;
+  const trimmedAddress = address.trim();
+  const trimmedCity = city.trim();
+  const trimmedState = state.trim();
+  const trimmedZip = zip?.trim() || '';
+
+  const queries = [
+    [trimmedAddress, trimmedCity, trimmedState, trimmedZip].filter(Boolean).join(', '),
+    [trimmedAddress, trimmedCity, trimmedState].filter(Boolean).join(', '),
+    [trimmedCity, trimmedState, trimmedZip].filter(Boolean).join(', '),
+    [trimmedCity, trimmedState].filter(Boolean).join(', '),
+  ].filter(Boolean);
 
   try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'MAHA-FromTheFarm/1.0' },
-    });
-    const data = await res.json();
-
-    if (data && data.length > 0) {
-      return {
-        latitude: parseFloat(data[0].lat),
-        longitude: parseFloat(data[0].lon),
-      };
+    for (const q of queries) {
+      const geo = await queryNominatim(q);
+      if (geo) return geo;
     }
     return null;
   } catch {
@@ -34,12 +58,17 @@ export async function geocodeAddress(
 }
 
 export async function geocodeZip(zip: string): Promise<GeoResult | null> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&postalcode=${encodeURIComponent(zip)}&countrycodes=us&limit=1`;
+  const email = process.env.GEOCODER_CONTACT_EMAIL;
+  const contactSuffix = email ? ` (${email})` : '';
+  const url = `https://nominatim.openstreetmap.org/search?format=json&postalcode=${encodeURIComponent(zip)}&countrycodes=us&limit=1${
+    email ? `&email=${encodeURIComponent(email)}` : ''
+  }`;
 
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'MAHA-FromTheFarm/1.0' },
+      headers: { 'User-Agent': `MAHA-FromTheFarm/1.0${contactSuffix}` },
     });
+    if (!res.ok) return null;
     const data = await res.json();
 
     if (data && data.length > 0) {

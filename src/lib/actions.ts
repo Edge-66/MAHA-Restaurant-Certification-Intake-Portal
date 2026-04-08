@@ -9,7 +9,8 @@ import {
   sendFarmDecision,
   sendPasswordResetEmail,
 } from '@/lib/email';
-import { geocodeAddress } from '@/lib/geocode';
+import { geocodeAddress, geocodeZip } from '@/lib/geocode';
+import { DEFAULT_FARM_HERO_IMAGE } from '@/lib/farmDefaults';
 
 function farmCertRequiresVerifierAck(certType: string | null | undefined): boolean {
   return certType === 'aga' || certType === 'raa' || certType === 'other';
@@ -143,6 +144,7 @@ export async function submitApplication(
         cert_other: (formData.get('farm_cert_other') as string) || null,
         cert_file_url: (formData.get('farm_cert_file_url') as string) || null,
         health_practices: farmHealthPractices.length > 0 ? farmHealthPractices : null,
+        hero_image_url: DEFAULT_FARM_HERO_IMAGE,
       };
 
       const { data: farm, error: fError } = await admin
@@ -702,12 +704,17 @@ export async function backfillMissingFarmCoordinates(options?: {
       continue;
     }
 
-    const geo = await geocodeAddress(
+    let geo = await geocodeAddress(
       farm.address?.trim() || '',
       farm.city.trim(),
       farm.state.trim(),
       farm.zip?.trim() || null
     );
+
+    // Fallback for messy/partial addresses: geocode by ZIP centroid when available.
+    if (!geo && farm.zip?.trim()) {
+      geo = await geocodeZip(farm.zip.trim());
+    }
 
     if (!geo) {
       failed.push({
