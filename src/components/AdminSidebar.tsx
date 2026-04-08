@@ -25,14 +25,6 @@ function IconInbox({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
   );
 }
 
-function IconQueue({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-    </svg>
-  );
-}
-
 function IconShield({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
@@ -45,6 +37,45 @@ function IconUsers({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.09 9.09 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 004.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+    </svg>
+  );
+}
+
+/** Building / venue — restaurant admin */
+function IconRestaurant({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
+      />
+    </svg>
+  );
+}
+
+/** Home / farmstead — farmer admin */
+function IconFarmer({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75"
+      />
+    </svg>
+  );
+}
+
+/** Archive / ledger — canonical application archive */
+function IconArchive({ className = 'w-5 h-5 shrink-0' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+      />
     </svg>
   );
 }
@@ -70,8 +101,15 @@ function IconBook({ className = 'w-4 h-4 shrink-0' }: { className?: string }) {
 const navItems: NavItem[] = [
   { href: '/admin/review-queue', label: 'Review queue', icon: <IconInbox /> },
   { href: '/admin', label: 'Dashboard', icon: <IconDashboard /> },
-  { href: '/admin/submissions', label: 'All applications', icon: <IconQueue /> },
+  { href: '/admin/restaurants', label: 'Restaurant admin', icon: <IconRestaurant /> },
+  { href: '/admin/farmers', label: 'Farmer admin', icon: <IconFarmer /> },
 ];
+
+const archiveNavItem: NavItem = {
+  href: '/admin/submissions',
+  label: 'All applications',
+  icon: <IconArchive />,
+};
 
 const tier3Items: NavItem[] = [
   { href: '/admin/permissions', label: 'Permissions', icon: <IconShield /> },
@@ -116,6 +154,15 @@ export default function AdminSidebar({ adminTier = 1 }: { adminTier?: number }) 
     }
     if (href === '/admin') {
       return pathname === '/admin';
+    }
+    if (href === '/admin/restaurants') {
+      return pathname === '/admin/restaurants' || pathname.startsWith('/admin/restaurants/');
+    }
+    if (href === '/admin/farmers') {
+      return pathname === '/admin/farmers' || pathname.startsWith('/admin/farms');
+    }
+    if (href === '/admin/submissions') {
+      return pathname.startsWith('/admin/submissions');
     }
     return pathname.startsWith(href);
   }
@@ -193,6 +240,21 @@ export default function AdminSidebar({ adminTier = 1 }: { adminTier?: number }) 
             </li>
           ))}
         </ul>
+
+        <div className={`mt-4 pt-4 border-t border-[#2d6a4f] ${collapsed ? 'md:mt-3 md:pt-3' : ''}`}>
+          <ul className="flex md:flex-col gap-1 md:space-y-1">
+            <li className="flex-shrink-0">
+              <Link
+                href={archiveNavItem.href}
+                className={linkClass(archiveNavItem.href)}
+                title={archiveNavItem.label}
+              >
+                {archiveNavItem.icon}
+                <span className={collapsed ? 'md:hidden' : ''}>{archiveNavItem.label}</span>
+              </Link>
+            </li>
+          </ul>
+        </div>
 
         {adminTier >= 3 && (
           <div className={`hidden md:block mt-6 ${collapsed ? 'md:mt-4' : ''}`}>
@@ -292,9 +354,14 @@ export default function AdminSidebar({ adminTier = 1 }: { adminTier?: number }) 
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
           </svg>
         </Link>
-        <div className={`flex items-center gap-3 ${collapsed ? 'md:justify-center' : ''}`}>
+        <div className={`flex items-center gap-3 min-w-0 ${collapsed ? 'md:justify-center' : ''}`}>
           <ProfileDropdown accountHref="/admin/account" variant="dark" dropDirection="up" />
-          <span className={`text-xs text-green-400 truncate ${collapsed ? 'md:hidden' : ''}`}>Account</span>
+          <Link
+            href="/admin/account"
+            className={`text-xs text-green-400 hover:text-white truncate transition-colors underline-offset-2 hover:underline ${collapsed ? 'md:hidden' : ''}`}
+          >
+            Account
+          </Link>
         </div>
       </div>
 

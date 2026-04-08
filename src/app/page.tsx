@@ -1,12 +1,17 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import Reveal from '@/components/Reveal';
+import { createClient } from '@/lib/supabase/server';
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const showApplyCtas = !user;
+
   return (
     <div>
       {/* Hero */}
-      <section className="relative text-white overflow-hidden -mt-16">
+      <section className="relative text-white overflow-hidden -mt-16 min-h-[calc(100dvh+4rem)]">
         <Image
           src="/mahahero.jpg"
           alt="Farm hero background"
@@ -30,12 +35,14 @@ export default function HomePage() {
               comes with full supplier transparency.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/apply"
-                className="bg-white text-[#1b4332] px-8 py-3.5 rounded-xl font-semibold text-center hover:bg-green-50 transition-colors"
-              >
-                Apply for Certification
-              </Link>
+              {showApplyCtas && (
+                <Link
+                  href="/apply"
+                  className="bg-white text-[#1b4332] px-8 py-3.5 rounded-xl font-semibold text-center hover:bg-green-50 transition-colors"
+                >
+                  Apply for Certification
+                </Link>
+              )}
               <Link
                 href="/directory"
                 className="border-2 border-white/30 text-white px-8 py-3.5 rounded-xl font-semibold text-center hover:bg-white/10 transition-colors"
@@ -223,12 +230,14 @@ export default function HomePage() {
                   buyers in the directory.
                 </p>
                 <div className="flex items-center gap-4 flex-wrap">
-                  <Link
-                    href="/apply"
-                    className="inline-block bg-white text-[#1b4332] px-6 py-3 rounded-xl font-semibold hover:bg-green-50 transition-colors text-sm"
-                  >
-                    Register Your Farm
-                  </Link>
+                  {showApplyCtas && (
+                    <Link
+                      href="/apply"
+                      className="inline-block bg-white text-[#1b4332] px-6 py-3 rounded-xl font-semibold hover:bg-green-50 transition-colors text-sm"
+                    >
+                      Register Your Farm
+                    </Link>
+                  )}
                   <Link
                     href="/directory"
                     className="text-sm text-green-300 hover:text-white font-medium transition-colors"
@@ -334,12 +343,14 @@ export default function HomePage() {
               and local sourcing.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/apply"
-                className="inline-block bg-white text-[#1b4332] px-8 py-3.5 rounded-xl font-semibold hover:bg-green-50 transition-colors"
-              >
-                Start Your Application
-              </Link>
+              {showApplyCtas && (
+                <Link
+                  href="/apply"
+                  className="inline-block bg-white text-[#1b4332] px-8 py-3.5 rounded-xl font-semibold hover:bg-green-50 transition-colors"
+                >
+                  Start Your Application
+                </Link>
+              )}
               <Link
                 href="/directory"
                 className="inline-block border-2 border-white/30 text-white px-8 py-3.5 rounded-xl font-semibold hover:bg-white/10 transition-colors"

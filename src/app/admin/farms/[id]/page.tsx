@@ -223,7 +223,7 @@ export default function AdminFarmDetailPage() {
       setDangerWorking(false);
       setDangerConfirm(null);
     } else {
-      router.push('/admin/farms');
+      router.push('/admin/farmers');
     }
   }
 
@@ -239,8 +239,8 @@ export default function AdminFarmDetailPage() {
     return (
       <div className="text-center py-20 text-stone-500">
         Farm not found.
-        <button onClick={() => router.push('/admin/submissions?tab=farms')} className="block mx-auto mt-4 text-[#2d6a4f] hover:underline">
-          ← Back to Submissions
+        <button onClick={() => router.push('/admin/farmers')} className="block mx-auto mt-4 text-[#2d6a4f] hover:underline">
+          ← Back to farmer admin
         </button>
       </div>
     );
@@ -256,10 +256,10 @@ export default function AdminFarmDetailPage() {
         </div>
       )}
       <button
-        onClick={() => router.push('/admin/submissions?tab=farms')}
+        onClick={() => router.push('/admin/farmers')}
         className="text-sm text-[#2d6a4f] hover:underline mb-6 inline-block"
       >
-        ← Back to Submissions
+        ← Back to farmer admin
       </button>
 
       {farm.status === 'pending' && (

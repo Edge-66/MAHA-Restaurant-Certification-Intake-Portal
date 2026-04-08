@@ -175,8 +175,8 @@ export default function SubmissionDetailPage() {
     return (
       <div className="text-center py-20 text-stone-500">
         Submission not found.
-        <button onClick={() => router.push('/admin/submissions')} className="block mx-auto mt-4 text-[#2d6a4f] hover:underline">
-          ← Back to Submissions
+        <button onClick={() => router.push('/admin/restaurants')} className="block mx-auto mt-4 text-[#2d6a4f] hover:underline">
+          ← Back to restaurant admin
         </button>
       </div>
     );
@@ -194,10 +194,10 @@ export default function SubmissionDetailPage() {
         </div>
       )}
       <button
-        onClick={() => router.push('/admin/submissions')}
+        onClick={() => router.push('/admin/restaurants')}
         className="text-sm text-[#2d6a4f] hover:underline mb-6 inline-block"
       >
-        ← Back to Submissions
+        ← Back to restaurant admin
       </button>
 
       {/* Header */}

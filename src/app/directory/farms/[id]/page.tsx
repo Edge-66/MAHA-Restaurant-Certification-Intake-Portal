@@ -1,7 +1,7 @@
-import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { parseFarmTagField } from '@/lib/farmTags';
+import { fetchFarmByIdForPublicProfile } from '@/lib/supabase/directory-farms';
 
 export const revalidate = 60;
 
@@ -21,20 +21,16 @@ export default async function FarmProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const { data: farm, error } = await supabase
-    .from('farms')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const farm = await fetchFarmByIdForPublicProfile(id);
 
-  if (error || !farm) {
+  if (!farm) {
     notFound();
   }
 
-  // Only show approved farms publicly
-  if (farm.status !== 'approved') {
+  // Only show approved farms publicly (tolerate legacy casing)
+  const st = (farm.status ?? '').trim().toLowerCase();
+  if (st !== 'approved') {
     notFound();
   }
 

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Fraunces, Great_Vibes } from 'next/font/google';
 import { useState, useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 const mahaWordmark = Fraunces({
@@ -20,8 +20,10 @@ const BASE_NAV = [
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [dashboardHref, setDashboardHref] = useState<string | null>(null);
+  const [accountHref, setAccountHref] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const isHome = pathname === '/';
 
   const navLinks = [
@@ -36,14 +38,22 @@ export default function Header() {
   useEffect(() => {
     const supabase = createClient();
     function setDashboardForRole(profileRole: string | undefined) {
-      if (profileRole === 'restaurant') setDashboardHref('/dashboard/restaurant');
-      else if (profileRole === 'farm') setDashboardHref('/dashboard/farm');
-      else setDashboardHref('/admin/review-queue');
+      if (profileRole === 'restaurant') {
+        setDashboardHref('/dashboard/restaurant');
+        setAccountHref('/dashboard/account');
+      } else if (profileRole === 'farm') {
+        setDashboardHref('/dashboard/farm');
+        setAccountHref('/dashboard/account');
+      } else {
+        setDashboardHref('/admin/review-queue');
+        setAccountHref('/admin/account');
+      }
     }
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         setDashboardHref(null);
+        setAccountHref(null);
         return;
       }
       const { data: profile } = await supabase
@@ -57,6 +67,7 @@ export default function Header() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         setDashboardHref(null);
+        setAccountHref(null);
         return;
       }
       supabase.from('profiles').select('role').eq('id', session.user.id).single().then(({ data: profile }) => {
@@ -77,6 +88,20 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
+  async function handleSignOut() {
+    setOpen(false);
+    await createClient().auth.signOut();
+    router.push('/login');
+    router.refresh();
+  }
+
+  const menuItemClass = (href: string) =>
+    `block px-4 py-2.5 text-sm font-medium transition-colors ${
+      pathname === href
+        ? 'text-[#2d6a4f] bg-[#2d6a4f]/5'
+        : 'text-stone-700 hover:bg-stone-50 hover:text-stone-900'
+    }`;
+
   return (
     <header className={`${isHome ? 'absolute' : 'relative'} top-0 left-0 right-0 z-50 border-b ${isHome ? 'bg-transparent border-white/10' : 'bg-[#2d6a4f] border-[#1b4332]'}`}>
       <div className="w-full pl-2 pr-2 sm:pl-3 sm:pr-3 md:pl-4 md:pr-4">
@@ -94,9 +119,9 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* Hamburger button — three horizontal lines */}
-          <div ref={menuRef} className="ml-auto shrink-0 -mr-0.5 sm:-mr-1">
+          <div ref={menuRef} className="relative ml-auto shrink-0 -mr-0.5 sm:-mr-1">
             <button
+              type="button"
               onClick={() => setOpen(!open)}
               aria-label="Toggle menu"
               aria-expanded={open}
@@ -107,30 +132,37 @@ export default function Header() {
               <span className="block w-full h-[2px] bg-white rounded-full" />
             </button>
 
-            {/* Dropdown */}
             {open && (
-              <div className="absolute right-0 top-[calc(100%+4px)] w-56 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
+              <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-56 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
                 <nav className="py-2">
                   {navLinks.map(({ label, href }) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      className={`block px-4 py-2.5 text-sm font-medium transition-colors ${
-                        pathname === href
-                          ? 'text-[#2d6a4f] bg-[#2d6a4f]/5'
-                          : 'text-stone-700 hover:bg-stone-50 hover:text-stone-900'
-                      }`}
-                    >
+                    <Link key={href} href={href} className={menuItemClass(href)} onClick={() => setOpen(false)}>
                       {label}
                     </Link>
                   ))}
                   <div className="my-2 border-t border-stone-100" />
                   <Link
                     href={dashboardHref ?? '/login'}
-                    className="block px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50 hover:text-stone-900 transition-colors"
+                    className={menuItemClass(dashboardHref ?? '/login')}
+                    onClick={() => setOpen(false)}
                   >
                     {dashboardHref ? 'Dashboard' : 'Sign In'}
                   </Link>
+                  {accountHref && (
+                    <>
+                      <div className="my-2 border-t border-stone-100" />
+                      <Link href={accountHref} className={menuItemClass(accountHref)} onClick={() => setOpen(false)}>
+                        Account
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void handleSignOut()}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Sign out
+                      </button>
+                    </>
+                  )}
                 </nav>
               </div>
             )}

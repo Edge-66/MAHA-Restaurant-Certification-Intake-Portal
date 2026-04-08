@@ -158,6 +158,31 @@ export default async function SubmissionsPage({
 
       {/* ── Farms tab ───────────────────────────────────────────────────────── */}
       {activeTab === 'farms' && (
+        <>
+          <div className="mb-6 rounded-xl border border-[#2d6a4f]/20 bg-[#2d6a4f]/5 px-4 py-4 text-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="font-medium text-stone-900">Farmer admin & map coordinates</p>
+                <p className="text-stone-600 mt-0.5 max-w-xl">
+                  Farmer admin has the directory geocoder, filters, and links to manage each farm profile and review queue.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Link
+                  href="/admin/farmers"
+                  className="inline-flex items-center justify-center rounded-lg bg-[#2d6a4f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1b4332] transition-colors"
+                >
+                  Open farmer admin
+                </Link>
+                <Link
+                  href="/admin/farms/pending"
+                  className="inline-flex items-center justify-center rounded-lg border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
+                >
+                  Pending queue
+                </Link>
+              </div>
+            </div>
+          </div>
         <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
           {allFarms.length === 0 ? (
             <div className="p-8 text-center text-stone-500 text-sm">No farm applications found.</div>
@@ -225,6 +250,7 @@ export default async function SubmissionsPage({
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   );

@@ -629,6 +629,127 @@ export async function submitFarmReviewDecision(
   return {};
 }
 
+const GEOCODE_THROTTLE_MS = 1100;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+export type BackfillGeocodeResult = {
+  error?: string;
+  updated: number;
+  skipped: number;
+  failed: { id: string; name: string; reason: string }[];
+  /** Farms still missing coordinates after this run (run again if more than zero). */
+  remainingWithoutCoords: number;
+};
+
+/**
+ * Fill latitude/longitude from address + city + state + zip using OpenStreetMap Nominatim
+ * (same as approval-time geocoding). Respects ~1 req/sec. Admin Tier 2+.
+ *
+ * Accuracy: usually good for street addresses; PO boxes, bad typos, or very rural routes may
+ * be wrong or land near town center — spot-check important listings.
+ */
+export async function backfillMissingFarmCoordinates(options?: {
+  /** Max farms to process this run (default 50). Re-run to process more. */
+  limit?: number;
+}): Promise<BackfillGeocodeResult> {
+  const limit = Math.min(Math.max(options?.limit ?? 50, 1), 80);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) {
+    return { error: 'Not authenticated.', updated: 0, skipped: 0, failed: [], remainingWithoutCoords: 0 };
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('admin_tier, role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'admin' || (profile?.admin_tier ?? 1) < 2) {
+    return { error: 'Admin access (Tier 2+) required.', updated: 0, skipped: 0, failed: [], remainingWithoutCoords: 0 };
+  }
+
+  const { data: latNull } = await supabase
+    .from('farms')
+    .select('id, name, address, city, state, zip, latitude, longitude')
+    .is('latitude', null);
+
+  const { data: lngNull } = await supabase
+    .from('farms')
+    .select('id, name, address, city, state, zip, latitude, longitude')
+    .is('longitude', null);
+
+  type FarmGeoRow = NonNullable<typeof latNull>[number];
+  const merged = new Map<string, FarmGeoRow>();
+  for (const row of [...(latNull ?? []), ...(lngNull ?? [])]) {
+    merged.set(row.id, row);
+  }
+
+  const queue = Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit);
+
+  let updated = 0;
+  let skipped = 0;
+  const failed: { id: string; name: string; reason: string }[] = [];
+
+  for (const farm of queue) {
+    if (!farm.city?.trim() || !farm.state?.trim()) {
+      skipped += 1;
+      continue;
+    }
+
+    const geo = await geocodeAddress(
+      farm.address?.trim() || '',
+      farm.city.trim(),
+      farm.state.trim(),
+      farm.zip?.trim() || null
+    );
+
+    if (!geo) {
+      failed.push({
+        id: farm.id,
+        name: farm.name,
+        reason: 'Geocoder returned no result (check address)',
+      });
+      await sleep(GEOCODE_THROTTLE_MS);
+      continue;
+    }
+
+    const { error: upErr } = await supabase
+      .from('farms')
+      .update({
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', farm.id);
+
+    if (upErr) {
+      failed.push({ id: farm.id, name: farm.name, reason: upErr.message });
+    } else {
+      updated += 1;
+    }
+
+    await sleep(GEOCODE_THROTTLE_MS);
+  }
+
+  const { data: latNullAfter } = await supabase.from('farms').select('id').is('latitude', null);
+  const { data: lngNullAfter } = await supabase.from('farms').select('id').is('longitude', null);
+  const still = new Set<string>();
+  for (const r of [...(latNullAfter ?? []), ...(lngNullAfter ?? [])]) still.add(r.id);
+
+  return {
+    updated,
+    skipped,
+    failed,
+    remainingWithoutCoords: still.size,
+  };
+}
+
 export async function updateSubmissionStatus(
   submissionId: string,
   status: string,

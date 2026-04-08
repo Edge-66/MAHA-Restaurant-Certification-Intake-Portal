@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
+import { fetchApprovedFarmsForDirectory } from '@/lib/supabase/directory-farms';
 import DirectoryClient from './DirectoryClient';
 
-export const revalidate = 60;
+/** Always fetch fresh directory data (avoid stale empty cache after new approvals). */
+export const dynamic = 'force-dynamic';
 
 export default async function DirectoryPage() {
   const supabase = await createClient();
@@ -16,17 +18,13 @@ export default async function DirectoryPage() {
     `)
     .eq('submissions.status', 'approved');
 
-  // Fetch approved farms
-  const { data: farms } = await supabase
-    .from('farms')
-    .select('*')
-    .eq('status', 'approved')
-    .order('name');
+  // Approved farms only (service role when configured so RLS cannot hide public listings)
+  const farms = await fetchApprovedFarmsForDirectory();
 
   return (
     <DirectoryClient
       restaurants={restaurants || []}
-      farms={farms || []}
+      farms={farms}
     />
   );
 }
