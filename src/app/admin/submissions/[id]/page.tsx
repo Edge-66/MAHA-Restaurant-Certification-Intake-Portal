@@ -33,6 +33,9 @@ export default function SubmissionDetailPage() {
   const [confirmDeleteDish, setConfirmDeleteDish] = useState<string | null>(null);
   const [pwResetting, setPwResetting] = useState(false);
   const [pwResetMsg, setPwResetMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [otherSubmissions, setOtherSubmissions] = useState<
+    { id: string; status: string; submitted_at: string; dishes: { id: string }[] }[]
+  >([]);
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -63,6 +66,17 @@ export default function SubmissionDetailPage() {
       const pl = (data as { restaurants?: { participation_level?: string } }).restaurants?.participation_level;
       if (pl === 'certified' || pl === 'participant') {
         setParticipationLevel(pl);
+      }
+
+      const restaurantId = (data as { restaurant_id?: string }).restaurant_id;
+      if (restaurantId) {
+        const { data: others } = await supabase
+          .from('submissions')
+          .select('id, status, submitted_at, dishes(id)')
+          .eq('restaurant_id', restaurantId)
+          .neq('id', id)
+          .order('submitted_at', { ascending: false });
+        setOtherSubmissions((others ?? []) as { id: string; status: string; submitted_at: string; dishes: { id: string }[] }[]);
       }
     }
     setLoading(false);
@@ -174,6 +188,30 @@ export default function SubmissionDetailPage() {
         </div>
         <StatusBadge status={submission.status} />
       </div>
+
+      {/* Other submissions from this restaurant */}
+      {otherSubmissions.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
+          <p className="text-xs font-semibold text-amber-900 mb-2 uppercase tracking-wide">
+            Other submissions from this restaurant
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {otherSubmissions.map((s) => (
+              <a
+                key={s.id}
+                href={`/admin/submissions/${s.id}`}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-white border-amber-200 text-amber-900 hover:bg-amber-100 transition-colors"
+              >
+                {new Date(s.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                <span className="text-amber-600">·</span>
+                {s.dishes.length} dish{s.dishes.length === 1 ? '' : 'es'}
+                <span className="text-amber-600">·</span>
+                <StatusBadge status={s.status} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Restaurant Info */}
       <div className="bg-white border border-stone-200 rounded-xl p-6 mb-6">
