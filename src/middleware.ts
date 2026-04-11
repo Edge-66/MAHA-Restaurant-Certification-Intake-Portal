@@ -68,7 +68,12 @@ export async function middleware(request: NextRequest) {
     if (user) {
       const role = await profileRole();
       if (role === 'farm') return redirectTo('/dashboard/farm');
-      if (role === 'restaurant') return redirectTo('/dashboard/restaurant/add-dishes');
+      if (role === 'restaurant') {
+        const url = request.nextUrl.clone();
+        url.pathname = '/dashboard/restaurant/add-dishes';
+        url.searchParams.set('from', 'apply');
+        return NextResponse.redirect(url);
+      }
       if (role === 'admin') return redirectTo('/admin/review-queue');
     }
     return supabaseResponse;

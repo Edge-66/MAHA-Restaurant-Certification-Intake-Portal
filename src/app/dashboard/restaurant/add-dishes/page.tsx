@@ -1,10 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import DishFormSection from '@/components/DishFormSection';
 import { DishFormData } from '@/lib/types';
 import { submitAdditionalRestaurantDishes } from '@/lib/actions';
+
+function RedirectBanner() {
+  const params = useSearchParams();
+  if (params.get('from') !== 'apply') return null;
+  return (
+    <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-4 py-3 text-sm mb-6">
+      You already have a MAHA account. Use this form to submit additional dishes for certification — your restaurant profile on file stays the same.
+    </div>
+  );
+}
 
 const emptyDish: DishFormData = {
   name: '',
@@ -106,6 +117,10 @@ export default function AddRestaurantDishesPage() {
           Submit dishes for MAHA review. Your restaurant profile on file will stay the same.
         </p>
       </div>
+
+      <Suspense>
+        <RedirectBanner />
+      </Suspense>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>

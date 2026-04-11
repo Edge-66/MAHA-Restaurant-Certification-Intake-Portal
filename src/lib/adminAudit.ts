@@ -49,9 +49,6 @@ export async function logAdminAction(input: AdminAuditInput): Promise<void> {
       metadata: input.metadata ?? null,
     });
 
-    // Enforce rolling retention (best effort) without cron.
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    await admin.from('admin_logs').delete().lt('created_at', cutoff);
   } catch {
     // Never block admin workflow if logging fails.
   }
