@@ -764,7 +764,7 @@ export default function AccountsPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => startDirectPassword(editKey, r.profileId)}
+                                  onClick={() => startDirectPassword(editKey, r.profileId!)}
                                   className="text-xs px-3 py-1.5 border border-amber-200 rounded-lg text-amber-900 bg-amber-50/80 hover:bg-amber-100/80 transition-colors whitespace-nowrap"
                                 >
                                   Set password
@@ -877,7 +877,7 @@ export default function AccountsPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => startDirectPassword(editKey, f.profileId)}
+                                  onClick={() => startDirectPassword(editKey, f.profileId!)}
                                   className="text-xs px-3 py-1.5 border border-amber-200 rounded-lg text-amber-900 bg-amber-50/80 hover:bg-amber-100/80 transition-colors whitespace-nowrap"
                                 >
                                   Set password
