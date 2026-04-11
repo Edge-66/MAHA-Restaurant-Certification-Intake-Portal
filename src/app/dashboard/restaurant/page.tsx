@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
+import CertifiedDishes from '@/components/CertifiedDishes';
+import QRCode from 'qrcode';
+import { headers } from 'next/headers';
 
 export default async function RestaurantDashboard() {
   const supabase = await createClient();
@@ -41,6 +44,22 @@ export default async function RestaurantDashboard() {
   const approvedDishes = allDishes.filter((d) => d.status === 'approved');
   const pendingSubmissions = submissions.filter((s: { status: string }) => s.status === 'pending' || s.status === 'needs_clarification');
   const isApproved = submissions.some((s: { status: string }) => s.status === 'approved');
+
+  // Generate a QR code for each approved dish pointing to the restaurant's public page
+  const headersList = await headers();
+  const host = headersList.get('host') ?? 'localhost:3000';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  const restaurantUrl = `${protocol}://${host}/restaurants/${restaurant.id}`;
+  const dishQrCodes: Record<string, string> = {};
+  await Promise.all(
+    approvedDishes.map(async (dish) => {
+      dishQrCodes[dish.id] = await QRCode.toDataURL(restaurantUrl, {
+        width: 240,
+        margin: 1,
+        color: { dark: '#1b4332', light: '#ffffff' },
+      });
+    })
+  );
 
   return (
     <div>
@@ -132,29 +151,15 @@ export default async function RestaurantDashboard() {
         {approvedDishes.length > 0 && (
           <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
-              <h2 className="font-semibold text-stone-900">Certified Dishes</h2>
+              <div>
+                <h2 className="font-semibold text-stone-900">Certified Dishes</h2>
+                <p className="text-xs text-stone-400 mt-0.5">Click a dish to expand details and download its QR code.</p>
+              </div>
               <span className="text-xs text-[#2d6a4f] font-medium bg-[#2d6a4f]/10 px-2 py-0.5 rounded-full">
                 {approvedDishes.length} approved
               </span>
             </div>
-            <div className="divide-y divide-stone-100">
-              {approvedDishes.map((dish) => (
-                <div key={dish.id} className="px-6 py-4 flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-stone-900 text-sm">{dish.name}</p>
-                    <p className="text-xs text-stone-500 mt-0.5">
-                      {dish.main_element} — {dish.supplier_name}
-                      {(dish.supplier_city || dish.supplier_state) && (
-                        <>, {[dish.supplier_city, dish.supplier_state].filter(Boolean).join(', ')}</>
-                      )}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 flex-shrink-0">
-                    {dish.category}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <CertifiedDishes dishes={approvedDishes} qrCodes={dishQrCodes} />
           </div>
         )}
 
