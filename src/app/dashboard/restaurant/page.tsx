@@ -53,12 +53,22 @@ export default async function RestaurantDashboard() {
         </div>
         <div className="flex items-center gap-3">
           {isApproved && (
-            <Link
-              href="/directory"
-              className="text-sm text-[#2d6a4f] hover:underline font-medium"
-            >
-              View Public Listing →
-            </Link>
+            <>
+              <Link
+                href={`/restaurants/${restaurant.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[#2d6a4f] hover:underline font-medium"
+              >
+                View Public Listing →
+              </Link>
+              <Link
+                href="/dashboard/restaurant/qr-card"
+                className="text-sm border border-[#2d6a4f] text-[#2d6a4f] px-3 py-1.5 rounded-lg font-medium hover:bg-[#2d6a4f]/5 transition-colors"
+              >
+                Get QR Card
+              </Link>
+            </>
           )}
           <Link
             href="/dashboard/restaurant/add-dishes"
