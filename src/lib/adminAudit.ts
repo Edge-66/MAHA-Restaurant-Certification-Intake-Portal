@@ -1,6 +1,6 @@
 'use server';
 
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -54,5 +54,29 @@ export async function logAdminAction(input: AdminAuditInput): Promise<void> {
     await admin.from('admin_logs').delete().lt('created_at', cutoff);
   } catch {
     // Never block admin workflow if logging fails.
+  }
+}
+
+/**
+ * Logs an admin_session_start event the first time an admin opens the admin
+ * panel within an 8-hour window. Safe to call repeatedly — a short-lived
+ * cookie prevents duplicate entries within that window.
+ */
+export async function trackAdminSession(): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    if (cookieStore.get('admin_session_start')) return;
+
+    await logAdminAction({ action: 'admin_session_start' });
+
+    cookieStore.set('admin_session_start', '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 8 * 60 * 60, // 8 hours
+      path: '/',
+    });
+  } catch {
+    // Never block admin workflow if session tracking fails.
   }
 }

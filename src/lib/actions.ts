@@ -1202,6 +1202,42 @@ export async function sendPasswordResetForRestaurant(restaurantId: string): Prom
   return sendPasswordReset(profile.id);
 }
 
+/**
+ * Tier 3: set a user's password directly (no email). Use when the user cannot access their inbox.
+ */
+export async function adminSetPasswordForUser(
+  targetUserId: string,
+  newPassword: string
+): Promise<{ error?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const masterErr = await assertNotMaster(targetUserId);
+  if (masterErr) return masterErr;
+
+  if (newPassword.length < 8) {
+    return { error: 'Password must be at least 8 characters.' };
+  }
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: 'Password reset is not configured (missing service role key).' };
+  }
+
+  const { error } = await admin.auth.admin.updateUserById(targetUserId, { password: newPassword });
+  if (error) return { error: error.message };
+
+  await logAdminAction({
+    action: 'password_set_by_admin',
+    target_type: 'user',
+    target_id: targetUserId,
+    metadata: null,
+  });
+  return {};
+}
+
 // ─── Master account protection ───────────────────────────────────────────────
 
 async function assertNotMaster(targetUserId: string): Promise<{ error?: string } | null> {
@@ -1418,6 +1454,321 @@ export async function getFarmUsers(): Promise<FarmUser[]> {
     status: f.status,
     profileId: profileMap[f.id] ?? null,
   }));
+}
+
+// ─── Tier 3: create linked accounts (auth user + profile + entity) ─────────────
+
+function createUserDuplicateMessage(msg: string): string {
+  if (/already|registered|exists/i.test(msg)) {
+    return 'An account already exists for this email. Use a different email or send a password reset.';
+  }
+  return msg;
+}
+
+export async function createAdminAccount(params: {
+  email: string;
+  password: string;
+  adminTier: number;
+  /** Stored on the auth user as user_metadata.full_name (optional). */
+  displayName?: string | null;
+}): Promise<{ error?: string; userId?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  const tier = Number(params.adminTier);
+  if (tier < 1 || tier > 3) return { error: 'Invalid permission tier.' };
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: 'Account creation is not configured (missing service role key).' };
+  }
+
+  const email = params.email.trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Please enter a valid email address.' };
+  }
+  if (params.password.length < 8) {
+    return { error: 'Password must be at least 8 characters.' };
+  }
+
+  const displayName = params.displayName?.trim();
+  const createUserPayload: {
+    email: string;
+    password: string;
+    email_confirm: boolean;
+    user_metadata?: { full_name: string };
+  } = {
+    email,
+    password: params.password,
+    email_confirm: true,
+  };
+  if (displayName) {
+    createUserPayload.user_metadata = { full_name: displayName };
+  }
+
+  const { data: authData, error: createUserError } = await admin.auth.admin.createUser(createUserPayload);
+
+  if (createUserError || !authData.user) {
+    return { error: createUserDuplicateMessage(createUserError?.message ?? 'Could not create account.') };
+  }
+
+  const userId = authData.user.id;
+
+  const { error: pError } = await admin.from('profiles').insert({
+    id: userId,
+    role: 'admin',
+    admin_tier: tier,
+    restaurant_id: null,
+    farm_id: null,
+  });
+
+  if (pError) {
+    await admin.auth.admin.deleteUser(userId);
+    return { error: pError.message };
+  }
+
+  await logAdminAction({
+    action: 'admin_account_created',
+    target_type: 'user',
+    target_id: userId,
+    metadata: { adminTier: tier },
+  });
+
+  return { userId };
+}
+
+export async function createRestaurantUserAccount(input: {
+  email: string;
+  password: string;
+  name: string;
+  contact_name: string;
+  contact_phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  website?: string | null;
+  description?: string | null;
+}): Promise<{ error?: string; restaurantId?: string; userId?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: 'Account creation is not configured (missing service role key).' };
+  }
+
+  const email = input.email.trim().toLowerCase();
+  const emailDisplay = input.email.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Please enter a valid email address.' };
+  }
+  if (input.password.length < 8) {
+    return { error: 'Password must be at least 8 characters.' };
+  }
+
+  const name = input.name.trim();
+  const contact_name = input.contact_name.trim();
+  const contact_phone = input.contact_phone.trim();
+  const address = input.address.trim();
+  const city = input.city.trim();
+  const state = input.state.trim();
+  const zip = input.zip.trim();
+
+  if (!name || !contact_name || !contact_phone || !address || !city || !state || !zip) {
+    return { error: 'Please fill in all required fields.' };
+  }
+
+  const { data: authData, error: createUserError } = await admin.auth.admin.createUser({
+    email,
+    password: input.password,
+    email_confirm: true,
+  });
+
+  if (createUserError || !authData.user) {
+    return { error: createUserDuplicateMessage(createUserError?.message ?? 'Could not create account.') };
+  }
+
+  const userId = authData.user.id;
+  let insertedRestaurantId: string | undefined;
+
+  try {
+    const restaurantData = {
+      name,
+      contact_name,
+      contact_email: emailDisplay,
+      contact_phone,
+      website: input.website?.trim() || null,
+      address,
+      city,
+      state,
+      zip,
+      participation_level: 'participant' as const,
+      description: input.description?.trim() || null,
+    };
+
+    const { data: restaurant, error: rError } = await admin
+      .from('restaurants')
+      .insert(restaurantData)
+      .select('id')
+      .single();
+
+    if (rError || !restaurant) {
+      throw new Error(rError?.message ?? 'Failed to save restaurant.');
+    }
+
+    insertedRestaurantId = restaurant.id;
+
+    const { error: pError } = await admin.from('profiles').insert({
+      id: userId,
+      role: 'restaurant',
+      restaurant_id: restaurant.id,
+      farm_id: null,
+    });
+
+    if (pError) {
+      throw new Error(pError.message);
+    }
+
+    await logAdminAction({
+      action: 'restaurant_account_created',
+      target_type: 'restaurant',
+      target_id: restaurant.id,
+      metadata: { userId },
+    });
+
+    return { restaurantId: restaurant.id, userId };
+  } catch (err) {
+    if (insertedRestaurantId) {
+      await admin.from('restaurants').delete().eq('id', insertedRestaurantId);
+    }
+    await admin.auth.admin.deleteUser(userId);
+    const message = err instanceof Error ? err.message : 'Something went wrong.';
+    return { error: message };
+  }
+}
+
+export async function createFarmUserAccount(input: {
+  email: string;
+  password: string;
+  name: string;
+  contact_name: string;
+  contact_phone: string;
+  city: string;
+  state: string;
+  address?: string | null;
+  zip?: string | null;
+  website?: string | null;
+  description?: string | null;
+  status: 'approved' | 'pending' | 'rejected';
+}): Promise<{ error?: string; farmId?: string; userId?: string }> {
+  const authErr = await assertTier3();
+  if (authErr) return authErr;
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { error: 'Account creation is not configured (missing service role key).' };
+  }
+
+  const email = input.email.trim().toLowerCase();
+  const emailDisplay = input.email.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Please enter a valid email address.' };
+  }
+  if (input.password.length < 8) {
+    return { error: 'Password must be at least 8 characters.' };
+  }
+
+  const name = input.name.trim();
+  const contact_name = input.contact_name.trim();
+  const contact_phone = input.contact_phone.trim();
+  const city = input.city.trim();
+  const state = input.state.trim();
+  if (!name || !contact_name || !contact_phone || !city || !state) {
+    return { error: 'Please fill in all required fields.' };
+  }
+
+  const status = input.status;
+  if (status !== 'approved' && status !== 'pending' && status !== 'rejected') {
+    return { error: 'Invalid farm status.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { user: actor } } = await supabase.auth.getUser();
+
+  const { data: authData, error: createUserError } = await admin.auth.admin.createUser({
+    email,
+    password: input.password,
+    email_confirm: true,
+  });
+
+  if (createUserError || !authData.user) {
+    return { error: createUserDuplicateMessage(createUserError?.message ?? 'Could not create account.') };
+  }
+
+  const userId = authData.user.id;
+  let insertedFarmId: string | undefined;
+
+  try {
+    const farmData = {
+      name,
+      contact_name,
+      contact_email: emailDisplay,
+      contact_phone,
+      website: input.website?.trim() || null,
+      address: input.address?.trim() || null,
+      city,
+      state,
+      zip: input.zip?.trim() || null,
+      description: input.description?.trim() || null,
+      hero_image_url: DEFAULT_FARM_HERO_IMAGE,
+      status,
+      approved_at: status === 'approved' ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+      reviewed_by: actor?.email ?? null,
+    };
+
+    const { data: farm, error: fError } = await admin.from('farms').insert(farmData).select('id').single();
+
+    if (fError || !farm) {
+      throw new Error(fError?.message ?? 'Failed to save farm.');
+    }
+
+    insertedFarmId = farm.id;
+
+    const { error: pError } = await admin.from('profiles').insert({
+      id: userId,
+      role: 'farm',
+      farm_id: farm.id,
+      restaurant_id: null,
+    });
+
+    if (pError) {
+      throw new Error(pError.message);
+    }
+
+    await logAdminAction({
+      action: 'farm_account_created',
+      target_type: 'farm',
+      target_id: farm.id,
+      metadata: { userId, status },
+    });
+
+    return { farmId: farm.id, userId };
+  } catch (err) {
+    if (insertedFarmId) {
+      await admin.from('farms').delete().eq('id', insertedFarmId);
+    }
+    await admin.auth.admin.deleteUser(userId);
+    const message = err instanceof Error ? err.message : 'Something went wrong.';
+    return { error: message };
+  }
 }
 
 // ─── Update user email ────────────────────────────────────────────────────────
